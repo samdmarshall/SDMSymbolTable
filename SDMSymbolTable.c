@@ -25,7 +25,6 @@
 #include <mach-o/dyld.h>
 #include <mach-o/nlist.h>
 #include <mach-o/ldsyms.h>
-
 #include "udis86.h"
 
 typedef struct SDMSTSymbolTableListEntry {
@@ -117,7 +116,7 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 						uint32_t *n_value = ((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
 						symbolAddress = *n_value;
 					}
-					libTable->offsets = realloc(libTable->offsets, libTable->offsetCount+0x1);
+					libTable->offsets = realloc(libTable->offsets, sizeof(struct SDMSTOffsetTable)*(libTable->offsetCount+0x1));
 					struct SDMSTOffsetTable *aSymbol = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
 					aSymbol->tableNumber = i;
 					aSymbol->symbolNumber = j;
@@ -152,7 +151,7 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
 	ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
 	while (ud_disassemble(&ud_obj)) {
-		printf(" %-24s\n", ud_insn_asm(&ud_obj));
+		printf("%s\n", ud_insn_asm(&ud_obj));
 	}
 	return 0x0;
 }
