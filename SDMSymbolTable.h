@@ -23,37 +23,49 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <mach-o/loader.h>
 
-typedef struct SegmentEntry {
+typedef struct SDMSTSegmentEntry {
 	uint32_t cmd;
 	uint32_t cmdsize;
 	char segname[16];
-} __attribute__ ((packed)) SegmentEntry;
+} __attribute__ ((packed)) SDMSTSegmentEntry;
 
-typedef struct LibraryTableInfo {
+typedef struct SDMSTLibraryTableInfo {
 	uint32_t imageNumber;
 	uintptr_t *mhOffset;
-	struct SegmentEntry *textSeg;
-	struct SegmentEntry *linkSeg; 
+	struct SDMSTSegmentEntry *textSeg;
+	struct SDMSTSegmentEntry *linkSeg;
+	struct symtab_command *symtabCommands;
+	uint32_t symtabCount;
 	uint32_t headerMagic;
 	bool is64bit;
-} __attribute__ ((packed)) LibraryTableInfo;
+} __attribute__ ((packed)) SDMSTLibraryTableInfo;
 
-typedef struct MachOSymbol {
+typedef struct SDMSTMachOSymbol {
 	void* functionPointer;
 	char *symbolName;
-} __attribute__ ((packed)) MachOSymbol;
+} __attribute__ ((packed)) SDMSTMachOSymbol;
 
-typedef struct LibrarySymbolTable {
+typedef struct SDMSTOffsetTable {
+	uint32_t tableNumber;
+	uint32_t symbolNumber;
+	void* offset;
+} __attribute__ ((packed)) SDMSTOffsetTable;
+
+typedef struct SDMSTLibrarySymbolTable {
 	char *libraryPath;
 	uintptr_t* libraryHandle;
-	struct LibraryTableInfo *libInfo;
+	struct SDMSTLibraryTableInfo *libInfo;
+	struct SDMSTMachOSymbol *table;
 	uint32_t symbolCount;
-	struct MachOSymbol *table;
-} __attribute__ ((packed)) LibrarySymbolTable;
+	struct SDMSTOffsetTable *offsets;
+	uint32_t offsetCount;
+} __attribute__ ((packed)) SDMSTLibrarySymbolTable;
 
-struct LibrarySymbolTable* SDMSTLoadLibrary(char *path);
-void* SDMSTSymbolLookup(struct LibrarySymbolTable *libTable, char *symbolName);
-void SDMSTLibraryRelease(struct LibrarySymbolTable *libTable);
+struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path);
+void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName);
+uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
+void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable);
 
 #endif
