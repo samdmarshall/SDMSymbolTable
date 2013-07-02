@@ -183,15 +183,19 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t nextOffset = 0xFFFFFFFF;
 	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
-		if (functionPointer < libTable->offsets[i].offset)
-			if ((uint32_t)libTable->offsets[i].offset < nextOffset)
+		if (functionPointer < libTable->offsets[i].offset) {
+			if ((uint32_t)libTable->offsets[i].offset < nextOffset) {
 				nextOffset = (uint32_t)libTable->offsets[i].offset;
+				printf("next offset: %x\n",nextOffset);
+			}
+		}
 	}
-	return nextOffset - (uint32_t)functionPointer;
+	return (nextOffset - (uint32_t)functionPointer);
 }
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
+	printf("length: %i\n",functionLength);
 	ud_t ud_obj;
 	ud_init(&ud_obj);
 	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 64 : 32));
