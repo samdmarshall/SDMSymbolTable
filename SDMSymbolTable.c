@@ -132,7 +132,7 @@ void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
 					struct SDMSTOffsetTable *aSymbol = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
 					aSymbol->tableNumber = i;
 					aSymbol->symbolNumber = j;
-					aSymbol->offset = (void*)symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
+					aSymbol->offset = (void*)symbolAddress + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
 					aSymbol->name = ((char *)strTable + entry->n_un.n_strx);
 					libTable->offsets[libTable->offsetCount] = *aSymbol;
 					libTable->offsetCount++;
@@ -214,12 +214,13 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
 	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
-		if (strcmp(libTable->offsets[i].name, symbolName) == 0x0) {
+		if (SMDSTSymbolDemangleAndCompare(libTable->offsets[i].name, symbolName)) {
 			symbolAddress = libTable->offsets[i].offset;
+			//printf("offset: %x\n",libTable->offsets[i].offset);
 			break;
 		}
 	}
-	if (symbolAddress == 0x0) {
+	/*if (symbolAddress == 0x0) {
 		symbolAddress = dlsym(libTable->libraryHandle, symbolName);
 		if (symbolAddress) {
 			libTable->table = realloc(libTable->table, (libTable->symbolCount+0x1)*sizeof(struct SDMSTMachOSymbol));
@@ -260,7 +261,7 @@ void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolNa
 				}
 			}
 		}
-	}
+	}*/
 	return symbolAddress;
 }
 
