@@ -181,31 +181,24 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 }
 
 uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
-	uint32_t callLength = 0x0;
+	uint32_t nextOffset = 0xFFFFFFFF;
 	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
-		printf("function@: %x -- %x\n",libTable->offsets[i].offset, functionPointer);
-		if (libTable->offsets[i].offset == functionPointer) {
-			if (i+1 < libTable->offsetCount) {
-				callLength = libTable->offsets[i+1].offset - libTable->offsets[i].offset;
-				break;
-			} else {
-				
-			}
-		}
+		if (functionPointer < libTable->offsets[i].offset)
+			if ((uint32_t)libTable->offsets[i].offset < nextOffset)
+				nextOffset = (uint32_t)libTable->offsets[i].offset;
 	}
-	return callLength;
+	return nextOffset - (uint32_t)functionPointer;
 }
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
-	uint32_t functionLength = 0x0;//SDMSTGetFunctionLength(libTable, functionPointer);
+	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
 	ud_t ud_obj;
-
 	ud_init(&ud_obj);
 	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 64 : 32));
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
-	ud_set_input_buffer(&ud_obj, functionPointer, 0xFFFFFFFF);
+	ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
 	while (ud_disassemble(&ud_obj)) {
-		char *code = ud_insn_asm(&ud_obj);
+		char *code = (char*)ud_insn_asm(&ud_obj);
 		printf("%s\n",code);
 		functionLength++;
 		if (strcmp(code, "ret")==0) {
@@ -217,9 +210,9 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 
 void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
-	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
-		if (strcmp(libTable->table[i].symbolName, symbolName) == 0x0) {
-			symbolAddress = libTable->table[i].functionPointer;
+	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
+		if (strcmp(libTable->offsets[i].name, symbolName) == 0x0) {
+			symbolAddress = libTable->offsets[i].offset;
 			break;
 		}
 	}
@@ -262,48 +255,6 @@ void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolNa
 						break;
 					}
 				}
-				/*for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
-					struct symtab_command *cmd = (struct symtab_command *)(&(libTable->libInfo->symtabCommands[i]));
-					uint64_t fslide = 0x0, mslide = 0x0;
-					if (libTable->libInfo->is64bit) {
-						struct SDMSTSeg64Data *textData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
-						struct SDMSTSeg64Data *linkData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
-						fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-						mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
-					} else {
-						struct SDMSTSeg32Data *textData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
-						struct SDMSTSeg32Data *linkData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
-						fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-						mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
-					}
-					struct SDMSTSymbolTableListEntry *entry = (struct SDMSTSymbolTableListEntry *)((char*)libTable->libInfo->mhOffset + cmd->symoff + fslide);
-					for (uint32_t j = 0x0; j < cmd->nsyms; j++) {
-						if (!(entry->n_type & N_STAB) && ((entry->n_type & N_TYPE) == N_SECT)) {
-							char *strTable = (char*)libTable->libInfo->mhOffset + cmd->stroff + fslide;
-							if (SMDSTSymbolDemangleAndCompare(((char *)strTable + entry->n_un.n_strx), symbolName)) {
-								if (libTable->libInfo->is64bit) {
-									uint64_t *n_value = (uint64_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
-									symbolAddress = (void*)*n_value;
-								} else {
-									uint32_t *n_value = (uint32_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
-									symbolAddress = (void*)*n_value;
-								}
-								libTable->table = realloc(libTable->table, libTable->symbolCount+0x1);
-								struct SDMSTMachOSymbol *newSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
-								newSymbol->functionPointer = symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
-								newSymbol->symbolName = (char*)calloc(0x1, strlen(symbolName)+0x1);
-								strcpy(newSymbol->symbolName, symbolName);
-								libTable->table[libTable->symbolCount] = *newSymbol;
-								libTable->symbolCount++;
-								foundSymbol = true;
-								break;
-							}
-						}
-						entry = (struct SDMSTSymbolTableListEntry *)((char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t))));
-					}
-					if (foundSymbol)
-						break;
-				}*/
 			}
 		}
 	}
