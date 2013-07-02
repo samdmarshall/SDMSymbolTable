@@ -197,16 +197,20 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 }
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
-	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
-	printf("length: %i\n",functionLength);
+	uint32_t functionLength = 0x0;//SDMSTGetFunctionLength(libTable, functionPointer);
 	ud_t ud_obj;
 
 	ud_init(&ud_obj);
 	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 64 : 32));
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
-	ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
+	ud_set_input_buffer(&ud_obj, functionPointer, 0xFFFFFFFF);
 	while (ud_disassemble(&ud_obj)) {
-		printf("%s\n", ud_insn_asm(&ud_obj));
+		char *code = ud_insn_asm(&ud_obj);
+		printf("%s\n",code);
+		functionLength++;
+		if (strcmp(code, "ret")==0) {
+			break;
+		}
 	}
 	return 0x0;
 }
