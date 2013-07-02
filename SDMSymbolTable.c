@@ -178,7 +178,7 @@ struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
 
 bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 	bool matchesName = false;
-	if (symFromTable) {
+	if (symFromTable && symbolName) {
 		uint32_t tabSymLength = strlen(symFromTable);
 		uint32_t symLength = strlen(symbolName);
 		if (symLength <= tabSymLength) {
@@ -206,7 +206,7 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 	uint32_t argumentCount = 0x0;
 	if (functionPointer) {
 		uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
-		struct SDMSTInputRegisters functionInput = {{false, false, false, false, false, false, false, false, false, false, false, false, false, false}};
+		bool inputRegisters[0xe] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false};
 		ud_t ud_obj;
 		ud_init(&ud_obj);
 		ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 0x40 : 0x20));
@@ -218,13 +218,13 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 			for (uint32_t i = 0x0; i < 0xe; i++) {
 				char *offset = strstr(code, kInputRegs[i].name);
 				if (offset && strlen(offset) == strlen(kInputRegs[i].name))
-					functionInput.reg[kInputRegs[i].number] = true;
+					inputRegisters[kInputRegs[i].number] = true;
 			}
 			if (strcmp(code, "ret")==0x0)
 				break;
 		}
 		for (uint32_t i = 0x0; i < 0xe; i++)
-			if (functionInput.reg[i])
+			if (inputRegisters[i])
 				argumentCount = kInputRegs[i].number+1;
 	}
 	return argumentCount;

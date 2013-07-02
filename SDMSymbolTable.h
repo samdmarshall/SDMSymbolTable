@@ -30,10 +30,6 @@ typedef struct SDMSTInputRegisterType {
 	uint32_t number;
 } __attribute__ ((packed)) SDMSTInputRegisterType;
 
-typedef struct SDMSTInputRegisters {
-	bool reg[0xe];
-} __attribute__ ((packed)) SDMSTInputRegisters;
-
 typedef struct SDMSTSegmentEntry {
 	uint32_t cmd;
 	uint32_t cmdsize;
