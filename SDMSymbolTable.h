@@ -51,6 +51,7 @@ typedef struct SDMSTOffsetTable {
 	uint32_t tableNumber;
 	uint32_t symbolNumber;
 	void* offset;
+	char *name;
 } __attribute__ ((packed)) SDMSTOffsetTable;
 
 typedef struct SDMSTLibrarySymbolTable {
