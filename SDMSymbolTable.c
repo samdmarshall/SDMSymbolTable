@@ -90,17 +90,17 @@ void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
 }
 
 int CompareTableEntries(const void *entry1, const void *entry2) {
-	if (((struct SDMSTOffsetTable *)entry1)->offset < ((struct SDMSTOffsetTable *)entry2)->offset) return -1;
-	if (((struct SDMSTOffsetTable *)entry1)->offset == ((struct SDMSTOffsetTable *)entry2)->offset) return 0;
-	if (((struct SDMSTOffsetTable *)entry1)->offset > ((struct SDMSTOffsetTable *)entry2)->offset) return 1;
+	if (((struct SDMSTMachOSymbol *)entry1)->offset < ((struct SDMSTMachOSymbol *)entry2)->offset) return -1;
+	if (((struct SDMSTMachOSymbol *)entry1)->offset == ((struct SDMSTMachOSymbol *)entry2)->offset) return 0;
+	if (((struct SDMSTMachOSymbol *)entry1)->offset > ((struct SDMSTMachOSymbol *)entry2)->offset) return 1;
 	return -0;
 }
 
 void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
-	if (libTable->offsets == NULL) {
+	if (libTable->table == NULL) {
 		void* symbolAddress = 0x0;
-		libTable->offsets = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
-		libTable->offsetCount = 0x0;
+		libTable->table = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
+		libTable->symbolCount = 0x0;
 		if (libTable->libInfo == NULL)
 			SDMSTBuildLibraryInfo(libTable);
 		for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
@@ -128,19 +128,19 @@ void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
 						uint32_t *n_value = (uint32_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
 						symbolAddress = (void*)*n_value;
 					}
-					libTable->offsets = realloc(libTable->offsets, sizeof(struct SDMSTOffsetTable)*(libTable->offsetCount+0x1));
-					struct SDMSTOffsetTable *aSymbol = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
+					libTable->table = realloc(libTable->table, sizeof(struct SDMSTMachOSymbol)*(libTable->symbolCount+0x1));
+					struct SDMSTMachOSymbol *aSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
 					aSymbol->tableNumber = i;
 					aSymbol->symbolNumber = j;
 					aSymbol->offset = (void*)symbolAddress + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
 					aSymbol->name = ((char *)strTable + entry->n_un.n_strx);
-					libTable->offsets[libTable->offsetCount] = *aSymbol;
-					libTable->offsetCount++;
+					libTable->table[libTable->symbolCount] = *aSymbol;
+					libTable->symbolCount++;
 				}
 				entry = (struct SDMSTSymbolTableListEntry *)((char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t))));
 			}
 		}
-		qsort(libTable->offsets, libTable->offsetCount, sizeof(struct SDMSTOffsetTable), CompareTableEntries);
+		qsort(libTable->table, libTable->symbolCount, sizeof(struct SDMSTMachOSymbol), CompareTableEntries);
 	}
 }
 
@@ -154,10 +154,8 @@ struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
 		if (table->libInfo == NULL) {
 			SDMSTBuildLibraryInfo(table);
 		}
+		table->table = NULL;
 		table->symbolCount = 0x0;
-		table->table = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
-		table->offsets = NULL;
-		table->offsetCount = 0x0;
 		SDMSTGenerateSortedSymbolTable(table);
 	}
 	return table;
@@ -182,10 +180,10 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 
 uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t nextOffset = 0xffffffff;
-	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
-		if (functionPointer < libTable->offsets[i].offset) {
-			if ((uint32_t)libTable->offsets[i].offset < nextOffset) {
-				nextOffset = (uint32_t)libTable->offsets[i].offset;
+	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
+		if (functionPointer < libTable->table[i].offset) {
+			if ((uint32_t)libTable->table[i].offset < nextOffset) {
+				nextOffset = (uint32_t)libTable->table[i].offset;
 			}
 		}
 	}
@@ -213,9 +211,9 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 
 void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
-	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
-		if (SMDSTSymbolDemangleAndCompare(libTable->offsets[i].name, symbolName)) {
-			symbolAddress = libTable->offsets[i].offset;
+	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
+		if (SMDSTSymbolDemangleAndCompare(libTable->table[i].name, symbolName)) {
+			symbolAddress = libTable->table[i].offset;
 			break;
 		}
 	}
@@ -224,10 +222,6 @@ void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolNa
 
 void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable) {
 	free(libTable->libInfo);
-	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
-		free(libTable->table[i].symbolName);
-	}
-	free(libTable->offsets);
 	free(libTable->table);
 	dlclose(libTable->libraryHandle);
 	free(libTable);

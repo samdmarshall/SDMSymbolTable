@@ -43,16 +43,11 @@ typedef struct SDMSTLibraryTableInfo {
 } __attribute__ ((packed)) SDMSTLibraryTableInfo;
 
 typedef struct SDMSTMachOSymbol {
-	void* functionPointer;
-	char *symbolName;
-} __attribute__ ((packed)) SDMSTMachOSymbol;
-
-typedef struct SDMSTOffsetTable {
 	uint32_t tableNumber;
 	uint32_t symbolNumber;
 	void* offset;
 	char *name;
-} __attribute__ ((packed)) SDMSTOffsetTable;
+} __attribute__ ((packed)) SDMSTMachOSymbol;
 
 typedef struct SDMSTLibrarySymbolTable {
 	char *libraryPath;
@@ -60,8 +55,6 @@ typedef struct SDMSTLibrarySymbolTable {
 	struct SDMSTLibraryTableInfo *libInfo;
 	struct SDMSTMachOSymbol *table;
 	uint32_t symbolCount;
-	struct SDMSTOffsetTable *offsets;
-	uint32_t offsetCount;
 } __attribute__ ((packed)) SDMSTLibrarySymbolTable;
 
 struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path);
