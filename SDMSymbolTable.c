@@ -168,11 +168,9 @@ struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
 		table->libraryPath = path;
 		table->libraryHandle = handle;
 		table->libInfo = NULL;
-		if (table->libInfo == NULL) {
-			SDMSTBuildLibraryInfo(table);
-		}
 		table->table = NULL;
 		table->symbolCount = 0x0;
+		SDMSTBuildLibraryInfo(table);
 		SDMSTGenerateSortedSymbolTable(table);
 	}
 	return table;
@@ -197,13 +195,10 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 
 uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t nextOffset = 0xffffffff;
-	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
-		if (functionPointer < libTable->table[i].offset) {
-			if ((uint32_t)libTable->table[i].offset < nextOffset) {
+	for (uint32_t i = 0x0; i < libTable->symbolCount; i++)
+		if (functionPointer < libTable->table[i].offset)
+			if ((uint32_t)libTable->table[i].offset < nextOffset)
 				nextOffset = (uint32_t)libTable->table[i].offset;
-			}
-		}
-	}
 	return (nextOffset - (uint32_t)functionPointer);
 }
 
@@ -219,32 +214,29 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 		ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
 		while (ud_disassemble(&ud_obj)) {
 			char *code = (char*)ud_insn_asm(&ud_obj);
+			printf("%s\n",code);
 			for (uint32_t i = 0x0; i < 0xe; i++) {
 				char *offset = strstr(code, kInputRegs[i].name);
-				if (offset && strlen(offset) == strlen(kInputRegs[i].name)) {
+				if (offset && strlen(offset) == strlen(kInputRegs[i].name))
 					functionInput.reg[kInputRegs[i].number] = true;
-				}
 			}
-			if (strcmp(code, "ret")==0x0) {
+			if (strcmp(code, "ret")==0x0)
 				break;
-			}
 		}
-		for (uint32_t i = 0x0; i < 0xe; i++) {
+		for (uint32_t i = 0x0; i < 0xe; i++)
 			if (functionInput.reg[i])
 				argumentCount = kInputRegs[i].number+1;
-		}
 	}
 	return argumentCount;
 }
 
 void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
-	for (uint32_t i = 0x0; i < libTable->symbolCount; i++) {
+	for (uint32_t i = 0x0; i < libTable->symbolCount; i++)
 		if (SMDSTSymbolDemangleAndCompare(libTable->table[i].name, symbolName)) {
 			symbolAddress = libTable->table[i].offset;
 			break;
 		}
-	}
 	return symbolAddress;
 }
 
