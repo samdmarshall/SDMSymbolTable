@@ -48,6 +48,100 @@ typedef struct SDMSTSeg64Data {
 	uint64_t fileoff;
 } __attribute__ ((packed)) SDMSTSeg64Data;
 
+void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
+	if (libTable->libInfo == NULL) {
+		libTable->libInfo = (struct SDMSTLibraryTableInfo *)calloc(0x1, sizeof(struct SDMSTLibraryTableInfo));
+		uint32_t count = _dyld_image_count();
+		for (uint32_t i = 0x0; i < count; i++) {
+			if (strcmp(_dyld_get_image_name(i), libTable->libraryPath) == 0x0) {
+				libTable->libInfo->imageNumber = i;
+				break;
+			}
+		}
+		const struct mach_header *imageHeader = _dyld_get_image_header(libTable->libInfo->imageNumber);
+		libTable->libInfo->headerMagic = imageHeader->magic;
+		libTable->libInfo->is64bit = ((imageHeader->cputype == CPU_TYPE_X86_64 || imageHeader->cputype == CPU_TYPE_POWERPC64) && (libTable->libInfo->headerMagic == MH_MAGIC_64 || libTable->libInfo->headerMagic == MH_CIGAM_64) ? true : false);
+		libTable->libInfo->mhOffset = (uintptr_t*)imageHeader;
+	}
+	struct mach_header *libHeader = (struct mach_header *)((char*)libTable->libInfo->mhOffset);
+	if (libTable->libInfo->headerMagic == libHeader->magic) {
+		if (libTable->libInfo->symtabCommands == NULL) {
+			struct load_command *loadCmd = (struct load_command *)((char*)libTable->libInfo->mhOffset + (libTable->libInfo->is64bit ? sizeof(struct mach_header_64) : sizeof(struct mach_header)));
+			libTable->libInfo->symtabCommands = (struct symtab_command *)calloc(0x1, sizeof(struct symtab_command));
+			libTable->libInfo->symtabCount = 0x0;
+			for (uint32_t i = 0x0; i < libHeader->ncmds; i++) {
+				if (loadCmd->cmd == LC_SYMTAB) {
+					libTable->libInfo->symtabCommands = realloc(libTable->libInfo->symtabCommands, (libTable->libInfo->symtabCount+1)*sizeof(struct symtab_command));
+					libTable->libInfo->symtabCommands[libTable->libInfo->symtabCount] = *(struct symtab_command *)loadCmd;
+					libTable->libInfo->symtabCount++;
+				}
+				if (loadCmd->cmd == (libTable->libInfo->is64bit ? LC_SEGMENT_64 : LC_SEGMENT)) {
+					struct SDMSTSegmentEntry *seg = (struct SDMSTSegmentEntry *)loadCmd;
+					if ((libTable->libInfo->textSeg == NULL) && !strncmp(SEG_TEXT,seg->segname,sizeof(seg->segname))) {
+						libTable->libInfo->textSeg = (struct SDMSTSegmentEntry *)seg;
+					} else if ((libTable->libInfo->linkSeg == NULL) && !strncmp(SEG_LINKEDIT,seg->segname,sizeof(seg->segname))) {
+						libTable->libInfo->linkSeg = (struct SDMSTSegmentEntry *)seg;
+					}
+				}
+				loadCmd = (char*)loadCmd + loadCmd->cmdsize;
+			}
+		}
+	}
+}
+
+int CompareTableEntries(const void *entry1, const void *entry2) {
+	if (((struct SDMSTOffsetTable *)entry1)->offset < ((struct SDMSTOffsetTable *)entry2)->offset) return -1;
+	if (((struct SDMSTOffsetTable *)entry1)->offset == ((struct SDMSTOffsetTable *)entry2)->offset) return 0;
+	if (((struct SDMSTOffsetTable *)entry1)->offset > ((struct SDMSTOffsetTable *)entry2)->offset) return 1;
+	return -0;
+}
+
+void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
+	if (libTable->offsets == NULL) {
+		void* symbolAddress = 0x0;
+		libTable->offsets = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
+		libTable->offsetCount = 0x0;
+		if (libTable->libInfo == NULL)
+			SDMSTBuildLibraryInfo(libTable);
+		for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
+			struct symtab_command *cmd = (struct symtab_command *)(&(libTable->libInfo->symtabCommands[i]));
+			uint64_t fslide = 0x0, mslide = 0x0;
+			if (libTable->libInfo->is64bit) {
+				struct SDMSTSeg64Data *textData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
+				struct SDMSTSeg64Data *linkData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
+				fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
+				mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
+			} else {
+				struct SDMSTSeg32Data *textData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
+				struct SDMSTSeg32Data *linkData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
+				fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
+				mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
+			}
+			struct SDMSTSymbolTableListEntry *entry = (struct SDMSTSymbolTableListEntry *)((char*)libTable->libInfo->mhOffset + cmd->symoff + fslide);
+			for (uint32_t j = 0x0; j < cmd->nsyms; j++) {
+				if (!(entry->n_type & N_STAB) && ((entry->n_type & N_TYPE) == N_SECT)) {
+					if (libTable->libInfo->is64bit) {
+						uint64_t *n_value = (uint64_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
+						symbolAddress = (void*)*n_value;
+					} else {
+						uint32_t *n_value = (uint32_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
+						symbolAddress = (void*)*n_value;
+					}
+					libTable->offsets = realloc(libTable->offsets, sizeof(struct SDMSTOffsetTable)*(libTable->offsetCount+0x1));
+					struct SDMSTOffsetTable *aSymbol = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
+					aSymbol->tableNumber = i;
+					aSymbol->symbolNumber = j;
+					aSymbol->offset = (void*)symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
+					libTable->offsets[libTable->offsetCount] = *aSymbol;
+					libTable->offsetCount++;
+				}
+				entry = (struct SDMSTSymbolTableListEntry *)((char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t))));
+			}
+		}
+		qsort(libTable->offsets, libTable->offsetCount, sizeof(struct SDMSTOffsetTable), CompareTableEntries);
+	}
+}
+
 struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
 	struct SDMSTLibrarySymbolTable *table = (struct SDMSTLibrarySymbolTable *)calloc(0x1, sizeof(struct SDMSTLibrarySymbolTable));
 	void* handle = dlopen(path, RTLD_LOCAL);
@@ -55,10 +149,14 @@ struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
 		table->libraryPath = path;
 		table->libraryHandle = handle;
 		table->libInfo = NULL;
+		if (table->libInfo == NULL) {
+			SDMSTBuildLibraryInfo(table);
+		}
 		table->symbolCount = 0x0;
 		table->table = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
 		table->offsets = NULL;
 		table->offsetCount = 0x0;
+		SDMSTGenerateSortedSymbolTable(table);
 	}
 	return table;
 }
@@ -80,55 +178,8 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 	return matchesName;
 }
 
-int CompareTableEntries(const void *entry1, const void *entry2) {
-	if (((struct SDMSTOffsetTable *)entry1)->offset < ((struct SDMSTOffsetTable *)entry2)->offset) return -1;
-	if (((struct SDMSTOffsetTable *)entry1)->offset == ((struct SDMSTOffsetTable *)entry2)->offset) return 0;
-	if (((struct SDMSTOffsetTable *)entry1)->offset > ((struct SDMSTOffsetTable *)entry2)->offset) return 1;
-}
-
 uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t callLength = 0x0;
-	if (libTable->offsets == NULL) {
-		void* symbolAddress = 0x0;
-		libTable->offsets = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
-		libTable->offsetCount = 0x0;
-		for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
-			struct symtab_command *cmd = &libTable->libInfo->symtabCommands[i];
-			uint64_t fslide = 0x0, mslide = 0x0;
-			if (libTable->libInfo->is64bit) {
-				struct SDMSTSeg64Data *textData = (char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry);
-				struct SDMSTSeg64Data *linkData = (char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry);
-				fslide = (linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-				mslide = (char*)libTable->libInfo->mhOffset - textData->vmaddr;
-			} else {
-				struct SDMSTSeg32Data *textData = (char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry);
-				struct SDMSTSeg32Data *linkData = (char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry);
-				fslide = (linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-				mslide = (char*)libTable->libInfo->mhOffset - textData->vmaddr;
-			}
-			struct SDMSTSymbolTableListEntry *entry = (char*)libTable->libInfo->mhOffset + cmd->symoff + fslide;
-			for (uint32_t j = 0x0; j < cmd->nsyms; j++) {
-				if (!(entry->n_type & N_STAB) && ((entry->n_type & N_TYPE) == N_SECT)) {
-					if (libTable->libInfo->is64bit) {
-						uint64_t *n_value = ((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
-						symbolAddress = *n_value;
-					} else {
-						uint32_t *n_value = ((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
-						symbolAddress = *n_value;
-					}
-					libTable->offsets = realloc(libTable->offsets, sizeof(struct SDMSTOffsetTable)*(libTable->offsetCount+0x1));
-					struct SDMSTOffsetTable *aSymbol = (struct SDMSTOffsetTable *)calloc(0x1, sizeof(struct SDMSTOffsetTable));
-					aSymbol->tableNumber = i;
-					aSymbol->symbolNumber = j;
-					aSymbol->offset = symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
-					libTable->offsets[libTable->offsetCount] = *aSymbol;
-					libTable->offsetCount++;
-				}
-				entry = (char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t)));
-			}
-		}
-		qsort(libTable->offsets, libTable->offsetCount, sizeof(struct SDMSTOffsetTable), CompareTableEntries);
-	}
 	for (uint32_t i = 0x0; i < libTable->offsetCount; i++) {
 		if (libTable->offsets[i].offset == functionPointer) {
 			if (i+1 < libTable->offsetCount) {
@@ -144,6 +195,7 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
+	printf("length: %i\n",functionLength);
 	ud_t ud_obj;
 
 	ud_init(&ud_obj);
@@ -170,92 +222,54 @@ void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolNa
 			libTable->table = realloc(libTable->table, (libTable->symbolCount+0x1)*sizeof(struct SDMSTMachOSymbol));
 			struct SDMSTMachOSymbol *newSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
 			newSymbol->functionPointer = symbolAddress;
-			newSymbol->symbolName = calloc(0x1, strlen(symbolName)+0x1);
+			newSymbol->symbolName = (char*)calloc(0x1, strlen(symbolName)+0x1);
 			strcpy(newSymbol->symbolName, symbolName);
 			libTable->table[libTable->symbolCount] = *newSymbol;
 			libTable->symbolCount++;
 		} else {
-			if (libTable->libInfo == NULL) {
-				libTable->libInfo = (struct SDMSTLibraryTableInfo *)calloc(0x1, sizeof(struct SDMSTLibraryTableInfo));
-				uint32_t count = _dyld_image_count();
-				for (uint32_t i = 0x0; i < count; i++) {
-					if (strcmp(_dyld_get_image_name(i), libTable->libraryPath) == 0x0) {
-						libTable->libInfo->imageNumber = i;
-						break;
-					}
-				}
-				const struct mach_header *imageHeader = _dyld_get_image_header(libTable->libInfo->imageNumber);
-				libTable->libInfo->headerMagic = imageHeader->magic;
-				libTable->libInfo->is64bit = ((imageHeader->cputype == CPU_TYPE_X86_64 || imageHeader->cputype == CPU_TYPE_POWERPC64) && (libTable->libInfo->headerMagic == MH_MAGIC_64 || libTable->libInfo->headerMagic == MH_CIGAM_64)  ? true : false);
-				libTable->libInfo->mhOffset = (char*)imageHeader;
-			}
 			if (libTable->libInfo) {
-				struct mach_header *libHeader = (char*)libTable->libInfo->mhOffset;
-				if (libTable->libInfo->headerMagic == libHeader->magic) {
-					if (libTable->libInfo->symtabCommands == NULL) {
-						struct load_command *loadCmd = (char*)libTable->libInfo->mhOffset + (libTable->libInfo->is64bit ? sizeof(struct mach_header_64) : sizeof(struct mach_header));
-						libTable->libInfo->symtabCommands = (struct symtab_command *)calloc(0x1, sizeof(struct symtab_command));
-						libTable->libInfo->symtabCount = 0x0;
-						for (uint32_t i = 0x0; i < libHeader->ncmds; i++) {
-							if (loadCmd->cmd == LC_SYMTAB) {
-								libTable->libInfo->symtabCommands = realloc(libTable->libInfo->symtabCommands, (libTable->libInfo->symtabCount+1)*sizeof(struct symtab_command));
-								libTable->libInfo->symtabCommands[libTable->libInfo->symtabCount] = *(struct symtab_command *)loadCmd;
-								libTable->libInfo->symtabCount++;
-							}
-							if (loadCmd->cmd == (libTable->libInfo->is64bit ? LC_SEGMENT_64 : LC_SEGMENT)) {
-								struct SDMSTSegmentEntry *seg = loadCmd;
-								if ((libTable->libInfo->textSeg == NULL) && !strncmp(SEG_TEXT,seg->segname,sizeof(seg->segname))) {
-									libTable->libInfo->textSeg = (char*)seg;
-								} else if ((libTable->libInfo->linkSeg == NULL) && !strncmp(SEG_LINKEDIT,seg->segname,sizeof(seg->segname))) {
-									libTable->libInfo->linkSeg = (char*)seg;
-								}
-							}
-							loadCmd = (char*)loadCmd + loadCmd->cmdsize;
-						}
+				bool foundSymbol = false;
+				for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
+					struct symtab_command *cmd = (struct symtab_command *)(&(libTable->libInfo->symtabCommands[i]));
+					uint64_t fslide = 0x0, mslide = 0x0;
+					if (libTable->libInfo->is64bit) {
+						struct SDMSTSeg64Data *textData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
+						struct SDMSTSeg64Data *linkData = (struct SDMSTSeg64Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
+						fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
+						mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
+					} else {
+						struct SDMSTSeg32Data *textData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry));
+						struct SDMSTSeg32Data *linkData = (struct SDMSTSeg32Data *)((char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry));
+						fslide = (uint64_t)(linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
+						mslide = (uint64_t)((char*)libTable->libInfo->mhOffset - textData->vmaddr);
 					}
-					bool foundSymbol = false;
-					for (uint32_t i = 0x0; i < libTable->libInfo->symtabCount; i++) {
-						struct symtab_command *cmd = &libTable->libInfo->symtabCommands[i];
-						uint64_t fslide = 0x0, mslide = 0x0;
-						if (libTable->libInfo->is64bit) {
-							struct SDMSTSeg64Data *textData = (char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry);
-							struct SDMSTSeg64Data *linkData = (char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry);
-							fslide = (linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-							mslide = (char*)libTable->libInfo->mhOffset - textData->vmaddr;
-						} else {
-							struct SDMSTSeg32Data *textData = (char*)libTable->libInfo->textSeg + sizeof(struct SDMSTSegmentEntry);
-							struct SDMSTSeg32Data *linkData = (char*)libTable->libInfo->linkSeg + sizeof(struct SDMSTSegmentEntry);
-							fslide = (linkData->vmaddr - textData->vmaddr) - linkData->fileoff;
-							mslide = (char*)libTable->libInfo->mhOffset - textData->vmaddr;
-						}
-						struct SDMSTSymbolTableListEntry *entry = (char*)libTable->libInfo->mhOffset + cmd->symoff + fslide;
-						for (uint32_t j = 0x0; j < cmd->nsyms; j++) {
-							if (!(entry->n_type & N_STAB) && ((entry->n_type & N_TYPE) == N_SECT)) {
-								char *strTable = (char*)libTable->libInfo->mhOffset + cmd->stroff + fslide;	
-								if (SMDSTSymbolDemangleAndCompare(((char *)strTable + entry->n_un.n_strx), symbolName)) {
-									if (libTable->libInfo->is64bit) {
-										uint64_t *n_value = (char*)entry + sizeof(struct SDMSTSymbolTableListEntry);
-										symbolAddress = (void*)*n_value;
-									} else {
-										uint32_t *n_value = (char*)entry + sizeof(struct SDMSTSymbolTableListEntry);
-										symbolAddress = (void*)*n_value;
-									}
-									libTable->table = realloc(libTable->table, libTable->symbolCount+0x1);
-									struct SDMSTMachOSymbol *newSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
-									newSymbol->functionPointer = symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
-									newSymbol->symbolName = calloc(0x1, strlen(symbolName)+0x1);
-									strcpy(newSymbol->symbolName, symbolName);
-									libTable->table[libTable->symbolCount] = *newSymbol;
-									libTable->symbolCount++;
-									foundSymbol = true;
-									break;
+					struct SDMSTSymbolTableListEntry *entry = (struct SDMSTSymbolTableListEntry *)((char*)libTable->libInfo->mhOffset + cmd->symoff + fslide);
+					for (uint32_t j = 0x0; j < cmd->nsyms; j++) {
+						if (!(entry->n_type & N_STAB) && ((entry->n_type & N_TYPE) == N_SECT)) {
+							char *strTable = (char*)libTable->libInfo->mhOffset + cmd->stroff + fslide;
+							if (SMDSTSymbolDemangleAndCompare(((char *)strTable + entry->n_un.n_strx), symbolName)) {
+								if (libTable->libInfo->is64bit) {
+									uint64_t *n_value = (uint64_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
+									symbolAddress = (void*)*n_value;
+								} else {
+									uint32_t *n_value = (uint32_t*)((char*)entry + sizeof(struct SDMSTSymbolTableListEntry));
+									symbolAddress = (void*)*n_value;
 								}
+								libTable->table = realloc(libTable->table, libTable->symbolCount+0x1);
+								struct SDMSTMachOSymbol *newSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
+								newSymbol->functionPointer = symbolAddress + mslide + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
+								newSymbol->symbolName = (char*)calloc(0x1, strlen(symbolName)+0x1);
+								strcpy(newSymbol->symbolName, symbolName);
+								libTable->table[libTable->symbolCount] = *newSymbol;
+								libTable->symbolCount++;
+								foundSymbol = true;
+								break;
 							}
-							entry = (char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t)));
 						}
-						if (foundSymbol)
-							break;
+						entry = (struct SDMSTSymbolTableListEntry *)((char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t))));
 					}
+					if (foundSymbol)
+						break;
 				}
 			}
 		}
