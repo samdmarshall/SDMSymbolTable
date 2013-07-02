@@ -208,30 +208,31 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 }
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
-	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
-	struct SDMSTInputRegisters functionInput = {{false, false, false, false, false, false, false, false, false, false, false, false, false, false}};
-	
-	ud_t ud_obj;
-	ud_init(&ud_obj);
-	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 0x40 : 0x20));
-	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
-	ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
-	while (ud_disassemble(&ud_obj)) {
-		char *code = (char*)ud_insn_asm(&ud_obj);
-		for (uint32_t i = 0x0; i < 0xe; i++) {
-			char *offset = strstr(code, kInputRegs[i].name);
-			if (offset && strlen(offset) == strlen(kInputRegs[i].name)) {
-				functionInput.reg[kInputRegs[i].number] = true;
+	uint32_t argumentCount = 0x0;
+	if (functionPointer) {
+		uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
+		struct SDMSTInputRegisters functionInput = {{false, false, false, false, false, false, false, false, false, false, false, false, false, false}};
+		ud_t ud_obj;
+		ud_init(&ud_obj);
+		ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 0x40 : 0x20));
+		ud_set_syntax(&ud_obj, UD_SYN_INTEL);
+		ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
+		while (ud_disassemble(&ud_obj)) {
+			char *code = (char*)ud_insn_asm(&ud_obj);
+			for (uint32_t i = 0x0; i < 0xe; i++) {
+				char *offset = strstr(code, kInputRegs[i].name);
+				if (offset && strlen(offset) == strlen(kInputRegs[i].name)) {
+					functionInput.reg[kInputRegs[i].number] = true;
+				}
+			}
+			if (strcmp(code, "ret")==0x0) {
+				break;
 			}
 		}
-		if (strcmp(code, "ret")==0x0) {
-			break;
+		for (uint32_t i = 0x0; i < 0xe; i++) {
+			if (functionInput.reg[i])
+				argumentCount = kInputRegs[i].number+1;
 		}
-	}
-	uint32_t argumentCount = 0x0;
-	for (uint32_t i = 0x0; i < 0xe; i++) {
-		if (functionInput.reg[i])
-			argumentCount++;
 	}
 	return argumentCount;
 }
