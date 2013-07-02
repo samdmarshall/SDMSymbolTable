@@ -25,10 +25,19 @@
 #include <stdlib.h>
 #include <mach-o/loader.h>
 
+typedef struct SDMSTInputRegisterType {
+	char *name;
+	uint32_t number;
+} __attribute__ ((packed)) SDMSTInputRegisterType;
+
+typedef struct SDMSTInputRegisters {
+	bool reg[0xe];
+} __attribute__ ((packed)) SDMSTInputRegisters;
+
 typedef struct SDMSTSegmentEntry {
 	uint32_t cmd;
 	uint32_t cmdsize;
-	char segname[16];
+	char segname[0x10];
 } __attribute__ ((packed)) SDMSTSegmentEntry;
 
 typedef struct SDMSTLibraryTableInfo {

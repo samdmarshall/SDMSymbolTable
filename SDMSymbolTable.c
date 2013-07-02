@@ -27,6 +27,23 @@
 #include <mach-o/ldsyms.h>
 #include "udis86.h"
 
+static struct SDMSTInputRegisterType kInputRegs[0xe] = {
+	{"rdi\0", 0x0},
+	{"rsi\0", 0x1},
+	{"rdx\0", 0x2},
+	{"rcx\0", 0x3},
+	{"r8\0", 0x4},
+	{"r9\0", 0x5},
+	{"xmm0\0", 0x6},
+	{"xmm1\0", 0x7},
+	{"xmm2\0", 0x8},
+	{"xmm3\0", 0x9},
+	{"xmm4\0", 0xa},
+	{"xmm5\0", 0xb},
+	{"xmm6\0", 0xc},
+	{"xmm7\0", 0xd}
+};
+
 typedef struct SDMSTSymbolTableListEntry {
 	union {
 	   uint32_t n_strx;
@@ -192,21 +209,31 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
-	printf("length: %i\n",functionLength);
+	struct SDMSTInputRegisters functionInput = {{false, false, false, false, false, false, false, false, false, false, false, false, false, false}};
+	
 	ud_t ud_obj;
 	ud_init(&ud_obj);
-	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 64 : 32));
+	ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 0x40 : 0x20));
 	ud_set_syntax(&ud_obj, UD_SYN_INTEL);
 	ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
 	while (ud_disassemble(&ud_obj)) {
 		char *code = (char*)ud_insn_asm(&ud_obj);
-		printf("%s\n",code);
-		functionLength++;
-		if (strcmp(code, "ret")==0) {
+		for (uint32_t i = 0x0; i < 0xe; i++) {
+			char *offset = strstr(code, kInputRegs[i].name);
+			if (offset && strlen(offset) == strlen(kInputRegs[i].name)) {
+				functionInput.reg[kInputRegs[i].number] = true;
+			}
+		}
+		if (strcmp(code, "ret")==0x0) {
 			break;
 		}
 	}
-	return 0x0;
+	uint32_t argumentCount = 0x0;
+	for (uint32_t i = 0x0; i < 0xe; i++) {
+		if (functionInput.reg[i])
+			argumentCount++;
+	}
+	return argumentCount;
 }
 
 void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
