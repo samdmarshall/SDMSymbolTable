@@ -164,7 +164,7 @@ typedef enum THUMB_16_Table {
 	LoadMulti = 512,
 	ConditionalBranch = 1024,
 	UnconditionalBranch = 2048
-};
+} THUMB_16_Table;
 
 typedef struct THUMB_16_OpCode {
 	uint32_t opcode;

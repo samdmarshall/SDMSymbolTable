@@ -27,15 +27,10 @@
 #include <mach-o/dyld.h>
 #include <mach-o/nlist.h>
 #include <mach-o/ldsyms.h>
-#include "udis86.h"
+#include "disasm.h"
 
 #pragma mark -
 #pragma mark Internal Types
-
-typedef struct SDMSTInputRegisterType {
-	char *name;
-	uint32_t number;
-} __attribute__ ((packed)) SDMSTInputRegisterType;
 
 typedef struct SDMSTSymbolTableListEntry {
 	union {
@@ -57,26 +52,6 @@ typedef struct SDMSTSeg64Data {
 	uint64_t vmsize;
 	uint64_t fileoff;
 } __attribute__ ((packed)) SDMSTSeg64Data;
-
-#pragma mark -
-#pragma mark Constants
-
-static struct SDMSTInputRegisterType kIntelInputRegs[0xe] = {
-	{"rdi\0", 0x0},
-	{"rsi\0", 0x1},
-	{"rdx\0", 0x2},
-	{"rcx\0", 0x3},
-	{"r8\0", 0x4},
-	{"r9\0", 0x5},
-	{"xmm0\0", 0x6},
-	{"xmm1\0", 0x7},
-	{"xmm2\0", 0x8},
-	{"xmm3\0", 0x9},
-	{"xmm4\0", 0xa},
-	{"xmm5\0", 0xb},
-	{"xmm6\0", 0xc},
-	{"xmm7\0", 0xd}
-};
 
 #pragma mark -
 #pragma mark Declarations
@@ -104,6 +79,7 @@ void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
 		}
 		const struct mach_header *imageHeader = _dyld_get_image_header(libTable->libInfo->imageNumber);
 		libTable->libInfo->headerMagic = imageHeader->magic;
+		libTable->libInfo->arch = (struct SDMSTLibraryArchitecture){imageHeader->cputype, imageHeader->cpusubtype};
 		libTable->libInfo->is64bit = ((imageHeader->cputype == CPU_TYPE_X86_64 || imageHeader->cputype == CPU_TYPE_POWERPC64) && (libTable->libInfo->headerMagic == MH_MAGIC_64 || libTable->libInfo->headerMagic == MH_CIGAM_64) ? true : false);
 		libTable->libInfo->mhOffset = (uintptr_t*)imageHeader;
 	}
@@ -233,26 +209,39 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 	uint32_t argumentCount = 0x0;
 	if (functionPointer) {
 		uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
-		bool inputRegisters[0xe] = {false, false, false, false, false, false, false, false, false, false, false, false, false, false};
-		ud_t ud_obj;
-		ud_init(&ud_obj);
-		ud_set_mode(&ud_obj, (libTable->libInfo->is64bit? 0x40 : 0x20));
-		ud_set_syntax(&ud_obj, UD_SYN_INTEL);
-		ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
-		while (ud_disassemble(&ud_obj)) {
-			char *code = (char*)ud_insn_asm(&ud_obj);
-			//printf("%s\n",code);
-			for (uint32_t i = 0x0; i < 0xe; i++) {
-				char *offset = strstr(code, kIntelInputRegs[i].name);
-				if (offset && strlen(offset) == strlen(kIntelInputRegs[i].name))
-					inputRegisters[kIntelInputRegs[i].number] = true;
+			struct SDMDisasm disasm = SDM_disasm_init((struct mach_header *)(libTable->libInfo->mhOffset));
+			SDM_disasm_setbuffer(&disasm, functionPointer, functionLength);
+			while (ud_disassemble(&disasm.handler.obj)) {
+				if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
+					char *code = (char*)ud_insn_asm(&(disasm.handler.obj));
+					printf("%s\n",code);
+					/*for (uint32_t i = 0x0; i < kIntelInputRegsCount; i++) {
+						char *offset = strstr(code, kIntelInputRegs[i].name);
+						if (offset && strlen(offset) == strlen(kIntelInputRegs[i].name))
+							inputRegisters[kIntelInputRegs[i].number] = true;
+					}*/
+					if (strcmp(code, "ret")==0x0)
+						break;
+				} else if (disasm.arch == ARMv6Arch || disasm.arch == ARMv7Arch) {
+
+				}
 			}
-			if (strcmp(code, "ret")==0x0)
-				break;
+		if (libTable->libInfo->arch.type == CPU_TYPE_I386 || libTable->libInfo->arch.type == CPU_TYPE_X86_64) {
+			bool inputRegisters[kIntelInputRegsCount] = false;
+			for (uint32_t i = 0x0; i < kIntelInputRegsCount; i++)
+				if (inputRegisters[i])
+					argumentCount = kIntelInputRegs[i].number+1;
+		} else if (libTable->libInfo->arch.type == CPU_TYPE_ARM) {
+			bool inputRegisters[kARMInputRegsCount] = false;
+			if (libTable->libInfo->arch.subtype == CPU_SUBTYPE_ARM_V6) {
+				
+			} else if (libTable->libInfo->arch.subtype == CPU_SUBTYPE_ARM_V7) {
+				
+			}
+			for (uint32_t i = 0x0; i < kARMInputRegsCount; i++)
+				if (inputRegisters[i])
+					argumentCount = kARMInputRegs[i].number+1;
 		}
-		for (uint32_t i = 0x0; i < 0xe; i++)
-			if (inputRegisters[i])
-				argumentCount = kIntelInputRegs[i].number+1;
 	}
 	return argumentCount;
 }

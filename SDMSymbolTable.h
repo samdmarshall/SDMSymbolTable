@@ -50,6 +50,11 @@ typedef struct SDMSTSegmentEntry {
 	char segname[0x10];
 } __attribute__ ((packed)) SDMSTSegmentEntry;
 
+typedef struct SDMSTLibraryArchitecture {
+	cpu_type_t type;
+	cpu_subtype_t subtype;
+} __attribute__ ((packed)) SDMSTLibraryArchitecture;
+
 typedef struct SDMSTLibraryTableInfo {
 	uint32_t imageNumber;
 	uintptr_t *mhOffset;
@@ -59,6 +64,7 @@ typedef struct SDMSTLibraryTableInfo {
 	uint32_t symtabCount;
 	uint32_t headerMagic;
 	bool is64bit;
+	struct SDMSTLibraryArchitecture arch;
 } __attribute__ ((packed)) SDMSTLibraryTableInfo;
 
 typedef struct SDMSTMachOSymbol {
