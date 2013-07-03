@@ -20,15 +20,29 @@
 #ifndef _SDMSYMBOLTABLE_H_
 #define _SDMSYMBOLTABLE_H_
 
+#pragma mark -
+#pragma mark Includes
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <mach-o/loader.h>
 
-typedef struct SDMSTInputRegisterType {
+#pragma mark -
+#pragma mark Types
+
+typedef void* (*SDMSTFunctionCall)();
+
+typedef struct SDMSTFunction {
 	char *name;
-	uint32_t number;
-} __attribute__ ((packed)) SDMSTInputRegisterType;
+	SDMSTFunctionCall offset;
+	uint32_t argc;
+	uintptr_t *argv;
+} __attribute__ ((packed)) SDMSTFunction;
+
+struct SDMSTFunctionReturn {
+	struct SDMSTFunction *function;
+	void* value;
+} __attribute__ ((packed)) SDMSTFunctionReturn;
 
 typedef struct SDMSTSegmentEntry {
 	uint32_t cmd;
@@ -62,9 +76,12 @@ typedef struct SDMSTLibrarySymbolTable {
 	uint32_t symbolCount;
 } __attribute__ ((packed)) SDMSTLibrarySymbolTable;
 
+#pragma mark -
+#pragma mark Declarations
+
 struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path);
-void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName);
-uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
+struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTable, char *name);
+struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function);
 void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable);
 
 #endif

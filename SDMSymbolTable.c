@@ -19,6 +19,8 @@
 #ifndef _SDMSYMBOLTABLE_C_
 #define _SDMSYMBOLTABLE_C_
 
+#pragma mark -
+#pragma mark Includes
 #include "SDMSymbolTable.h"
 #include <dlfcn.h>
 #include <mach/mach.h>
@@ -27,22 +29,13 @@
 #include <mach-o/ldsyms.h>
 #include "udis86.h"
 
-static struct SDMSTInputRegisterType kInputRegs[0xe] = {
-	{"rdi\0", 0x0},
-	{"rsi\0", 0x1},
-	{"rdx\0", 0x2},
-	{"rcx\0", 0x3},
-	{"r8\0", 0x4},
-	{"r9\0", 0x5},
-	{"xmm0\0", 0x6},
-	{"xmm1\0", 0x7},
-	{"xmm2\0", 0x8},
-	{"xmm3\0", 0x9},
-	{"xmm4\0", 0xa},
-	{"xmm5\0", 0xb},
-	{"xmm6\0", 0xc},
-	{"xmm7\0", 0xd}
-};
+#pragma mark -
+#pragma mark Internal Types
+
+typedef struct SDMSTInputRegisterType {
+	char *name;
+	uint32_t number;
+} __attribute__ ((packed)) SDMSTInputRegisterType;
 
 typedef struct SDMSTSymbolTableListEntry {
 	union {
@@ -64,6 +57,40 @@ typedef struct SDMSTSeg64Data {
 	uint64_t vmsize;
 	uint64_t fileoff;
 } __attribute__ ((packed)) SDMSTSeg64Data;
+
+#pragma mark -
+#pragma mark Constants
+
+static struct SDMSTInputRegisterType kIntelInputRegs[0xe] = {
+	{"rdi\0", 0x0},
+	{"rsi\0", 0x1},
+	{"rdx\0", 0x2},
+	{"rcx\0", 0x3},
+	{"r8\0", 0x4},
+	{"r9\0", 0x5},
+	{"xmm0\0", 0x6},
+	{"xmm1\0", 0x7},
+	{"xmm2\0", 0x8},
+	{"xmm3\0", 0x9},
+	{"xmm4\0", 0xa},
+	{"xmm5\0", 0xb},
+	{"xmm6\0", 0xc},
+	{"xmm7\0", 0xd}
+};
+
+#pragma mark -
+#pragma mark Declarations
+
+void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable);
+int SDMSTCompareTableEntries(const void *entry1, const void *entry2);
+void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable);
+bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName);
+uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
+uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
+SDMSTFunctionCall SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName);
+
+#pragma mark -
+#pragma mark Functions
 
 void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
 	if (libTable->libInfo == NULL) {
@@ -106,7 +133,7 @@ void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
 	}
 }
 
-int CompareTableEntries(const void *entry1, const void *entry2) {
+int SDMSTCompareTableEntries(const void *entry1, const void *entry2) {
 	if (((struct SDMSTMachOSymbol *)entry1)->offset < ((struct SDMSTMachOSymbol *)entry2)->offset) return -1;
 	if (((struct SDMSTMachOSymbol *)entry1)->offset == ((struct SDMSTMachOSymbol *)entry2)->offset) return 0;
 	if (((struct SDMSTMachOSymbol *)entry1)->offset > ((struct SDMSTMachOSymbol *)entry2)->offset) return 1;
@@ -157,7 +184,7 @@ void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
 				entry = (struct SDMSTSymbolTableListEntry *)((char*)entry + (sizeof(struct SDMSTSymbolTableListEntry) + (libTable->libInfo->is64bit ? sizeof(uint64_t) : sizeof(uint32_t))));
 			}
 		}
-		qsort(libTable->table, libTable->symbolCount, sizeof(struct SDMSTMachOSymbol), CompareTableEntries);
+		qsort(libTable->table, libTable->symbolCount, sizeof(struct SDMSTMachOSymbol), SDMSTCompareTableEntries);
 	}
 }
 
@@ -216,21 +243,21 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 			char *code = (char*)ud_insn_asm(&ud_obj);
 			printf("%s\n",code);
 			for (uint32_t i = 0x0; i < 0xe; i++) {
-				char *offset = strstr(code, kInputRegs[i].name);
-				if (offset && strlen(offset) == strlen(kInputRegs[i].name))
-					inputRegisters[kInputRegs[i].number] = true;
+				char *offset = strstr(code, kIntelInputRegs[i].name);
+				if (offset && strlen(offset) == strlen(kIntelInputRegs[i].name))
+					inputRegisters[kIntelInputRegs[i].number] = true;
 			}
 			if (strcmp(code, "ret")==0x0)
 				break;
 		}
 		for (uint32_t i = 0x0; i < 0xe; i++)
 			if (inputRegisters[i])
-				argumentCount = kInputRegs[i].number+1;
+				argumentCount = kIntelInputRegs[i].number+1;
 	}
 	return argumentCount;
 }
 
-void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
+SDMSTFunctionCall SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
 	for (uint32_t i = 0x0; i < libTable->symbolCount; i++)
 		if (SMDSTSymbolDemangleAndCompare(libTable->table[i].name, symbolName)) {
@@ -239,6 +266,41 @@ void* SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolNa
 		}
 	return symbolAddress;
 }
+
+struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTable, char *name) {
+	struct SDMSTFunction *function = (struct SDMSTFunction*)calloc(0x1, sizeof(struct SDMSTFunction));
+	function->name = name;
+	function->offset = SDMSTSymbolLookup(libTable, name);
+	function->argc = SDMSTGetArgumentCount(libTable, function->offset);
+	function->argv = (uintptr_t*)calloc(0xe, sizeof(uintptr_t));
+	return function;
+}
+
+struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function) {
+	struct SDMSTFunctionReturn *result = (struct SDMSTFunctionReturn*)calloc(0x1, sizeof(struct SDMSTFunctionReturn));
+	result->function = function;
+	result->value = NULL;
+	switch (function->argc) {
+		case 0: result->value = function->offset(); break;
+		case 1: result->value = function->offset(function->argv[0]); break;
+		case 2: result->value = function->offset(function->argv[0], function->argv[1]); break;
+		case 3: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2]); break;
+		case 4: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3]); break;
+		case 5: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4]); break;
+		case 6: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5]); break;
+		case 7: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6]); break;
+		case 8: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7]); break;
+		case 9: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8]); break;
+		case 10: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9]); break;
+		case 11: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10]); break;
+		case 12: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11]); break;
+		case 13: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11], function->argv[12]); break;
+		case 14: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11], function->argv[12], function->argv[13]); break;
+		default: break;
+	}
+	return result;
+}
+
 
 void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable) {
 	free(libTable->libInfo);
