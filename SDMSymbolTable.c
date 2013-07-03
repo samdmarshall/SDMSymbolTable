@@ -301,6 +301,15 @@ struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *li
 	return result;
 }
 
+void SDMSTFunctionRelease(struct SDMSTFunction *function) {
+	free(function->argv);
+	free(function);
+}
+
+void SDMSTFunctionReturnRelease(struct SDMSTFunctionReturn *functionReturn) {
+	SDMSTFunctionRelease(functionReturn->function);
+	free(functionReturn);
+}
 
 void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable) {
 	free(libTable->libInfo);

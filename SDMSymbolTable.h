@@ -82,6 +82,8 @@ typedef struct SDMSTLibrarySymbolTable {
 struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path);
 struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTable, char *name);
 struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function);
+void SDMSTFunctionRelease(struct SDMSTFunction *function);
+void SDMSTFunctionReturnRelease(struct SDMSTFunctionReturn *functionReturn);
 void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable);
 
 #endif
