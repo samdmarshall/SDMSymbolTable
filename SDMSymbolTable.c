@@ -241,7 +241,7 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 		ud_set_input_buffer(&ud_obj, functionPointer, functionLength);
 		while (ud_disassemble(&ud_obj)) {
 			char *code = (char*)ud_insn_asm(&ud_obj);
-			printf("%s\n",code);
+			//printf("%s\n",code);
 			for (uint32_t i = 0x0; i < 0xe; i++) {
 				char *offset = strstr(code, kIntelInputRegs[i].name);
 				if (offset && strlen(offset) == strlen(kIntelInputRegs[i].name))
