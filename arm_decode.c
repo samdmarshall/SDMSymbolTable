@@ -246,9 +246,9 @@
 #define THUMB_16_MS_Resolve(data) ((THUMB_16_MS_IfThen(data) << 18) + (THUMB_16_MS_Break(data) << 17) + (THUMB_16_MS_PopMulti(data) << 16) + (THUMB_16_MS_CmpNZ1(data) << 15) + (THUMB_16_MS_ReverseSHalf(data) << 14) + (THUMB_16_MS_ReversePHalf(data) << 13) + (THUMB_16_MS_ReverseWord(data) << 12) + (THUMB_16_MS_CmpNZ0(data) << 11) + (THUMB_16_MS_ProcState(data) << 10) + (THUMB_16_MS_SetEndian(data) << 9) + (THUMB_16_MS_PushMulti(data) << 8) + (THUMB_16_MS_CmpZ1(data) << 7) + (THUMB_16_MS_ExtenByte(data) << 6) + (THUMB_16_MS_ExtenHalf(data) << 5) + (THUMB_16_MS_ExtenSByte(data) << 4) + (THUMB_16_MS_ExtenSHalf(data) << 3) + (THUMB_16_MS_CmpZ0(data) << 2) + (THUMB_16_MS_Sub(data) << 1) + (THUMB_16_MS_Add(data)))
 #pragma mark -
 
-#define THUMB_16_SM_Resolve(data) (data)
+#define THUMB_16_SM_Resolve(data) (THUMB_16_StoreMulti(data))
 #pragma mark -
-#define THUMB_16_LM_Resolve(data) (data)
+#define THUMB_16_LM_Resolve(data) (THUMB_16_LoadMulti(data))
 #pragma mark -
 #define THUMB_16_CB_Resolve(data) (data)
 #pragma mark -
@@ -376,6 +376,18 @@ static THUMB_16_OpCode THUMB_16_MiscTable[19] = {
 	{120,"ifthen"}
 };
 
+static THUMB_16_OpCode THUMB_16_StoreMultiTable[3] = {
+	{0,"stm"},
+	{1,"stmia"},
+	{2,"stmea"}
+};
+
+static THUMB_16_OpCode THUMB_16_LoadMultiTable[3] = {
+	{0,"ldm"},
+	{1,"ldmia"},
+	{2,"ldmfd"}
+};
+
 static THUMB_16_OpCode *THUMB_16_MasterTable[7] = {
 	THUMB_16_BasicLogicTable,
 	THUMB_16_DataProcessingTable,
@@ -384,7 +396,9 @@ static THUMB_16_OpCode *THUMB_16_MasterTable[7] = {
 	THUMB_16_LoadStoreTable,
 	THUMB_16_PCAddressTable,
 	THUMB_16_SPAddressTable,
-	THUMB_16_MiscTable
+	THUMB_16_MiscTable,
+	THUMB_16_StoreMultiTable,
+	THUMB_16_LoadMultiTable
 };
 
 THUMB_16_OpCode arm_decode_opcode(uint32_t data) {
