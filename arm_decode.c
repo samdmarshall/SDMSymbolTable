@@ -87,20 +87,20 @@
 #pragma mark -
 
 #pragma mark Op Code
-#define THUMB_OP(data) ((data & 0xFF00) >> 10)
-#define THUMB_OP0(data) (THUMB_OP(data) >> 5)
-#define THUMB_OP1(data) ((THUMB_OP(data) >> 4) & 1)
-#define THUMB_OP2(data) ((THUMB_OP(data) >> 3) & 1)
-#define THUMB_OP3(data) ((THUMB_OP(data) >> 2) & 1)
-#define THUMB_OP4(data) ((THUMB_OP(data) >> 1) & 1)
-#define THUMB_OP5(data) ((THUMB_OP(data)) & 1)
+#define THUMB_OPCode(data) (((data & 0xFF00) >> 10) & 0x3F)
+#define THUMB_OP0(data) ((THUMB_OPCode(data) >> 5) & 1)
+#define THUMB_OP1(data) ((THUMB_OPCode(data) >> 4) & 1)
+#define THUMB_OP2(data) ((THUMB_OPCode(data) >> 3) & 1)
+#define THUMB_OP3(data) ((THUMB_OPCode(data) >> 2) & 1)
+#define THUMB_OP4(data) ((THUMB_OPCode(data) >> 1) & 1)
+#define THUMB_OP5(data) ((THUMB_OPCode(data)) & 1)
 
-#define THUMB_16_BL_OP(data) ((data) & 0xFF00) >> 9)
-#define THUMB_16_BL_OP0(data) (THUMB_16_BL_OP(data) >> 4)
-#define THUMB_16_BL_OP1(data) ((THUMB_16_BL_OP(data) >> 3) & 1)
-#define THUMB_16_BL_OP2(data) ((THUMB_16_BL_OP(data) >> 2) & 1)
-#define THUMB_16_BL_OP3(data) ((THUMB_16_BL_OP(data) >> 1) & 1)
-#define THUMB_16_BL_OP4(data) ((THUMB_16_BL_OP(data)) & 1)
+#define THUMB_16_BL_OPCode(data) (((data & 0xFF00) >> 9) & 0x1F)
+#define THUMB_16_BL_OP0(data) ((THUMB_16_BL_OPCode(data) >> 4) & 1)
+#define THUMB_16_BL_OP1(data) ((THUMB_16_BL_OPCode(data) >> 3) & 1)
+#define THUMB_16_BL_OP2(data) ((THUMB_16_BL_OPCode(data) >> 2) & 1)
+#define THUMB_16_BL_OP3(data) ((THUMB_16_BL_OPCode(data) >> 1) & 1)
+#define THUMB_16_BL_OP4(data) ((THUMB_16_BL_OPCode(data)) & 1)
 
 #define THUMB_16_BL_MOVCHECK(data) (((data & 0x00F0) >> 6) & 0x7)
 
@@ -126,9 +126,18 @@
 #define THUMB_16_LS_OPB1(data) ((data >> 1) & 1)
 #define THUMB_16_LS_OPB2(data) ((data) & 1)
 
+#define THUMB_16_MS_OPCode(data) (((data & 0x0FF0) >> 5) & 0x7F)
+#define THUMB_16_MS_OP0(data) ((THUMB_16_MS_OPCode(data) >> 6) & 1)
+#define THUMB_16_MS_OP1(data) ((THUMB_16_MS_OPCode(data) >> 5) & 1)
+#define THUMB_16_MS_OP2(data) ((THUMB_16_MS_OPCode(data) >> 4) & 1)
+#define THUMB_16_MS_OP3(data) ((THUMB_16_MS_OPCode(data) >> 3) & 1)
+#define THUMB_16_MS_OP4(data) ((THUMB_16_MS_OPCode(data) >> 2) & 1)
+#define THUMB_16_MS_OP5(data) ((THUMB_16_MS_OPCode(data) >> 1) & 1)
+#define THUMB_16_MS_OP6(data) ((THUMB_16_MS_OPCode(data)) & 1)
+
 #pragma mark Type
-#define THUMB_Is32Bit(data) (THUMB_OP(data) == 0x1F || THUMB_OP(data) == 0x1E || THUMB_OP(data) == 0x1D)
-#define THUMB_Is16Bit(data) !THUMB_Is32Bit(data)
+#define THUMB_Is32Bit(data) (THUMB_OPCode(data) == 0x1F || THUMB_OPCode(data) == 0x1E || THUMB_OPCode(data) == 0x1D)
+#define THUMB_Is16Bit(data) (!THUMB_Is32Bit(data))
 
 #pragma mark 16Bit Classes
 #define THUMB_16_BasicLogic(data) (THUMB_OP0(data) == 0 && THUMB_OP1(data) == 0)
@@ -146,19 +155,20 @@
 
 #define THUMB_16_TableResolve(data) ((THUMB_16_UnconditionalBranch(data) << 11) + (THUMB_16_ConditionalBranch(data) << 10) + (THUMB_16_LoadMulti(data) << 9) + (THUMB_16_StoreMulti(data) << 8) + (THUMB_16_MiscInstructions(data) << 7) + (THUMB_16_SPAddress(data) << 6) + (THUMB_16_PCAddress(data) << 5) + (THUMB_16_LoadStore(data) << 4) + (THUMB_16_LoadLiteral(data) << 3) + (THUMB_16_SpecialData(data) << 2) + (THUMB_16_DataProcessing(data) << 1) + THUMB_16_BasicLogic(data))
 #pragma mark -
-#define THUMB_16_BL_LShiftLeft(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 0))
+#define THUMB_16_BL_LShiftLeft(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 0) && THUMB_16_BL_MOVCHECK(data) != 0)
 #define THUMB_16_BL_LShiftRight(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 1))
 #define THUMB_16_BL_AShiftRight(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 0))
 #define THUMB_16_BL_Add(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 0 && THUMB_16_BL_OP4(data) == 0))
 #define THUMB_16_BL_Sub(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 0 && THUMB_16_BL_OP4(data) == 1))
-#define THUMB_16_BL_Add3Bit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 1 && THUMB_16_BL_OP4(data) == 0))
-#define THUMB_16_BL_Sub3Bit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 1 && THUMB_16_BL_OP4(data) == 1))
+#define THUMB_16_BL_AddThreeBit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 1 && THUMB_16_BL_OP4(data) == 0))
+#define THUMB_16_BL_SubThreeBit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1 && THUMB_16_BL_OP3(data) == 1 && THUMB_16_BL_OP4(data) == 1))
 #define THUMB_16_BL_Mov(data) (THUMB_16_BasicLogic(data) && ((THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 0) || ((THUMB_16_BL_OP0(data) == 0 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 0 && THUMB_16_BL_OP3(data) == 0 && THUMB_16_BL_OP4(data) == 0) && THUMB_16_BL_MOVCHECK(data) == 0)))
 #define THUMB_16_BL_Cmp(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 0 && THUMB_16_BL_OP2(data) == 1))
-#define THUMB_16_BL_Add8Bit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 0))
-#define THUMB_16_BL_Sub8Bit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1))
+#define THUMB_16_BL_AddEightBit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 0))
+#define THUMB_16_BL_SubEightBit(data) (THUMB_16_BasicLogic(data) && (THUMB_16_BL_OP0(data) == 1 && THUMB_16_BL_OP1(data) == 1 && THUMB_16_BL_OP2(data) == 1))
 
-#define THUMB_16_BL_Resolve(data) ((THUMB_16_BL_Sub8Bit(data) << 10) + (THUMB_16_BL_Add8Bit(data) << 9) + (THUMB_16_BL_Cmp(data) << 8) + (THUMB_16_BL_Mov(data) << 7) + (THUMB_16_BL_Sub3Bit(data) << 6) + (THUMB_16_BL_Add3Bit(data) << 5) + (THUMB_16_BL_Sub(data) << 4) + (THUMB_16_BL_Add(data) << 3) + (THUMB_16_BL_AShiftRight(data) << 2) + (THUMB_16_BL_LShiftRight(data) << 1) + (THUMB_16_BL_LShiftLeft(data)))
+#define THUMB_16_BL_Resolve(data) ((THUMB_16_BL_SubEightBit(data) << 10) + (THUMB_16_BL_AddEightBit(data) << 9) + (THUMB_16_BL_Cmp(data) << 8) + (THUMB_16_BL_Mov(data) << 7) + (THUMB_16_BL_SubThreeBit(data) << 6) + (THUMB_16_BL_AddThreeBit(data) << 5) + (THUMB_16_BL_Sub(data) << 4) + (THUMB_16_BL_Add(data) << 3) + (THUMB_16_BL_AShiftRight(data) << 2) + (THUMB_16_BL_LShiftRight(data) << 1) + (THUMB_16_BL_LShiftLeft(data)))
+
 #pragma mark -
 #define THUMB_16_DP_And(data) (THUMB_16_DataProcessing(data) && (THUMB_16_DP_OP0(data) == 0 && THUMB_16_DP_OP1(data) == 0 && THUMB_16_DP_OP2(data) == 0 && THUMB_16_DP_OP3(data) == 0))
 #define THUMB_16_DP_Eor(data) (THUMB_16_DataProcessing(data) && (THUMB_16_DP_OP0(data) == 0 && THUMB_16_DP_OP1(data) == 0 && THUMB_16_DP_OP2(data) == 0 && THUMB_16_DP_OP3(data) == 1))
@@ -213,8 +223,36 @@
 #pragma mark -
 #define THUMB_16_SP_Resolve(data) (THUMB_16_SPAddress(data))
 #pragma mark -
+#define THUMB_16_MS_Add(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 0 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 0))
+#define THUMB_16_MS_Sub(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 0 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 1))
+#define THUMB_16_MS_CmpZ0(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 0 && THUMB_16_MS_OP3(data) == 1))
+#define THUMB_16_MS_ExtenSHalf(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 0 && THUMB_16_MS_OP5(data) == 0))
+#define THUMB_16_MS_ExtenSByte(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 0 && THUMB_16_MS_OP5(data) == 1))
+#define THUMB_16_MS_ExtenHalf(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 1 && THUMB_16_MS_OP5(data) == 0))
+#define THUMB_16_MS_ExtenByte(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 1 && THUMB_16_MS_OP5(data) == 1))
+#define THUMB_16_MS_CmpZ1(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 1))
+#define THUMB_16_MS_PushMulti(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 0 && THUMB_16_MS_OP1(data) == 1 && THUMB_16_MS_OP2(data) == 0))
+#define THUMB_16_MS_SetEndian(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OPCode(data) == 50))
+#define THUMB_16_MS_ProcState(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OPCode(data) == 51))
+#define THUMB_16_MS_CmpNZ0(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 0 && THUMB_16_MS_OP3(data) == 1))
+#define THUMB_16_MS_ReverseWord(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 0 && THUMB_16_MS_OP5(data) == 0))
+#define THUMB_16_MS_ReversePHalf(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 0 && THUMB_16_MS_OP5(data) == 1))
+#define THUMB_16_MS_ReverseSHalf(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0 && THUMB_16_MS_OP4(data) == 1 && THUMB_16_MS_OP5(data) == 1))
+#define THUMB_16_MS_CmpNZ1(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 0 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 1))
+#define THUMB_16_MS_PopMulti(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 1 && THUMB_16_MS_OP2(data) == 0))
+#define THUMB_16_MS_Break(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 1 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 0))
+#define THUMB_16_MS_IfThen(data) (THUMB_16_MiscInstructions(data) && (THUMB_16_MS_OP0(data) == 1 && THUMB_16_MS_OP1(data) == 1 && THUMB_16_MS_OP2(data) == 1 && THUMB_16_MS_OP3(data) == 1))
 
+#define THUMB_16_MS_Resolve(data) ((THUMB_16_MS_IfThen(data) << 18) + (THUMB_16_MS_Break(data) << 17) + (THUMB_16_MS_PopMulti(data) << 16) + (THUMB_16_MS_CmpNZ1(data) << 15) + (THUMB_16_MS_ReverseSHalf(data) << 14) + (THUMB_16_MS_ReversePHalf(data) << 13) + (THUMB_16_MS_ReverseWord(data) << 12) + (THUMB_16_MS_CmpNZ0(data) << 11) + (THUMB_16_MS_ProcState(data) << 10) + (THUMB_16_MS_SetEndian(data) << 9) + (THUMB_16_MS_PushMulti(data) << 8) + (THUMB_16_MS_CmpZ1(data) << 7) + (THUMB_16_MS_ExtenByte(data) << 6) + (THUMB_16_MS_ExtenHalf(data) << 5) + (THUMB_16_MS_ExtenSByte(data) << 4) + (THUMB_16_MS_ExtenSHalf(data) << 3) + (THUMB_16_MS_CmpZ0(data) << 2) + (THUMB_16_MS_Sub(data) << 1) + (THUMB_16_MS_Add(data)))
+#pragma mark -
 
+#define THUMB_16_SM_Resolve(data) (data)
+#pragma mark -
+#define THUMB_16_LM_Resolve(data) (data)
+#pragma mark -
+#define THUMB_16_CB_Resolve(data) (data)
+#pragma mark -
+#define THUMB_16_UB_Resolve(data) (data)
 #pragma mark -
 #pragma mark Translated Instrunctions
 #pragma mark -
@@ -316,14 +354,37 @@ static THUMB_16_OpCode THUMB_16_SPAddressTable[1] = {
 	{0,"add"}
 };
 
-static THUMB_16_OpCode *THUMB_16_MasterTable[] = {
+static THUMB_16_OpCode THUMB_16_MiscTable[19] = {
+	{3,"add"},
+	{4,"sub"},
+	{8,"cbz"},
+	{16,"sxth"},
+	{18,"sxtb"},
+	{20,"uxth"},
+	{22,"uxtb"},
+	{24,"cbz"},
+	{32,"push"},
+	{50,"setend"},
+	{51,"cps"},
+	{72,"cbnz"},
+	{80,"rev"},
+	{82,"rev16"},
+	{86,"revsh"},
+	{88,"cbnz"},
+	{96,"pop"},
+	{112,"bkpt"},
+	{120,"ifthen"}
+};
+
+static THUMB_16_OpCode *THUMB_16_MasterTable[7] = {
 	THUMB_16_BasicLogicTable,
 	THUMB_16_DataProcessingTable,
 	THUMB_16_SpeciaDataTable,
 	THUMB_16_LoadLiteralTable,
 	THUMB_16_LoadStoreTable,
 	THUMB_16_PCAddressTable,
-	THUMB_16_SPAddressTable
+	THUMB_16_SPAddressTable,
+	THUMB_16_MiscTable
 };
 
 THUMB_16_OpCode arm_decode_opcode(uint32_t data) {
@@ -331,18 +392,18 @@ THUMB_16_OpCode arm_decode_opcode(uint32_t data) {
 		THUMB_16_Table tableNum = THUMB_16_TableNumberResolve(data);
 		uint32_t opcode;
 		switch (tableNum) {
-			case BL: {opcode = (uint32_t)log2l(THUMB_16_BL_Resolve(data)); break;}
-			case DP: {opcode = (uint32_t)log2l(THUMB_16_DP_Resolve(data)); break;}
-			case SD: {opcode = (uint32_t)log2l(THUMB_16_SD_Resolve(data)); break;}
-			case LL: {opcode = (uint32_t)log2l(THUMB_16_LL_Resolve(data)); break;}
-			case LS: {opcode = (uint32_t)log2l(THUMB_16_LS_Resolve(data)); break;}
-			case PC: {opcode = (uint32_t)log2l(THUMB_16_PC_Resolve(data)); break;}
-			case SP: {opcode = (uint32_t)log2l(THUMB_16_SP_Resolve(data)); break;}
-			case MS: {opcode = (uint32_t)log2l(THUMB_16_MS_Resolve(data)); break;}
-			case SM: {opcode = (uint32_t)log2l(THUMB_16_SM_Resolve(data)); break;}
-			case LM: {opcode = (uint32_t)log2l(THUMB_16_LM_Resolve(data)); break;}
-			case CB: {opcode = (uint32_t)log2l(THUMB_16_CB_Resolve(data)); break;}
-			case UB: {opcode = (uint32_t)log2l(THUMB_16_UB_Resolve(data)); break;}
+			case BL: {opcode = (uint32_t)log2l(THUMB_16_BL_Resolve(data)); break;};
+			case DP: {opcode = (uint32_t)log2l(THUMB_16_DP_Resolve(data)); break;};
+			case SD: {opcode = (uint32_t)log2l(THUMB_16_SD_Resolve(data)); break;};
+			case LL: {opcode = (uint32_t)log2l(THUMB_16_LL_Resolve(data)); break;};
+			case LS: {opcode = (uint32_t)log2l(THUMB_16_LS_Resolve(data)); break;};
+			case PC: {opcode = (uint32_t)log2l(THUMB_16_PC_Resolve(data)); break;};
+			case SP: {opcode = (uint32_t)log2l(THUMB_16_SP_Resolve(data)); break;};
+			case MS: {opcode = (uint32_t)log2l(THUMB_16_MS_Resolve(data)); break;};
+			case SM: {opcode = (uint32_t)log2l(THUMB_16_SM_Resolve(data)); break;};
+			case LM: {opcode = (uint32_t)log2l(THUMB_16_LM_Resolve(data)); break;};
+			case CB: {opcode = (uint32_t)log2l(THUMB_16_CB_Resolve(data)); break;};
+			case UB: {opcode = (uint32_t)log2l(THUMB_16_UB_Resolve(data)); break;};
 			default: break;
 		}
 		return THUMB_16_MasterTable[tableNum][opcode];
