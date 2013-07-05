@@ -24,9 +24,54 @@
 #include "udis86.h"
 #include "arm_decode.h"
 
+typedef struct SDMSTParsedLine {
+	char *instruction;
+	uint32_t instructionLen;
+	char *value0;
+	uint32_t value0Len;
+	char *value1;
+	uint32_t value1Len;
+} __attribute__ ((packed)) SDMSTParsedLine;
+
+typedef struct SDMSTInputRegisterType {
+	char *name;
+	uint32_t number;
+} __attribute__ ((packed)) SDMSTInputRegisterType;
+
+typedef struct IntelInstruction {
+	char *data;
+} __attribute__ ((packed)) IntelInstruction;
+
+#pragma mark -
+#pragma mark Constants
+
 #define kIntelInputRegsCount 0xe
 
 #define kARMInputRegsCount 0x4
+
+static SDMSTInputRegisterType kIntelInputRegs[kIntelInputRegsCount] = {
+	{"rdi\0", 0x0},
+	{"rsi\0", 0x1},
+	{"rdx\0", 0x2},
+	{"rcx\0", 0x3},
+	{"r8\0", 0x4},
+	{"r9\0", 0x5},
+	{"xmm0\0", 0x6},
+	{"xmm1\0", 0x7},
+	{"xmm2\0", 0x8},
+	{"xmm3\0", 0x9},
+	{"xmm4\0", 0xa},
+	{"xmm5\0", 0xb},
+	{"xmm6\0", 0xc},
+	{"xmm7\0", 0xd}
+};
+
+static SDMSTInputRegisterType kARMInputRegs[kARMInputRegsCount] = {
+	{"r0\0", 0x0},
+	{"r1\0", 0x1},
+	{"r2\0", 0x2},
+	{"r3\0", 0x3}
+};
 
 typedef enum CPUArchitecture {
 	InvalidArch = -1,
@@ -53,11 +98,11 @@ typedef struct SDMDisasm {
 	CPUArchitecture arch;
 	bool is64Bit;
 	Endianness endian;
+	ud_t obj;
 	union {
-		ud_t obj;
 		SDMDisasmObject arm;
 	} handler;
-} __attribute__ ((packed)) SDMDisasm;
+} SDMDisasm;
 
 SDMDisasm SDM_disasm_init(struct mach_header *header);
 void SDM_disasm_setbuffer(SDMDisasm *disasm, uint32_t *buffer, uint32_t length);

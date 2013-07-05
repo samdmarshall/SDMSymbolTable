@@ -426,4 +426,13 @@ THUMB_16_OpCode arm_decode_opcode(uint32_t data) {
 	}
 }
 
+char* arm_decode_thumb_16_registers(THUMB_16_OpCode code, uint32_t data) {
+	char *decode = calloc(1, strlen(code.instruction)+1);
+	strncpy(decode ,code.instruction, strlen(code.instruction));
+	switch (code.opcode) {
+		
+	}
+	return decode;
+}
+
 #endif

@@ -205,34 +205,62 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 	return (nextOffset - (uint32_t)functionPointer);
 }
 
+SDMSTParsedLine* SDMSTParse(char *code) {
+	SDMSTParsedLine *line = calloc(1, sizeof(SDMSTParsedLine));
+	line->instructionLen = strcspn(code, " ");
+	line->instruction = calloc(1, sizeof(char)*line->instructionLen);
+	line->instruction = strncpy(line->instruction, code, line->instructionLen);
+	line->value0Len = strcspn(code+(line->instructionLen+1), ", ");
+	line->value0 = calloc(1, sizeof(char)*line->value0Len);
+	line->value0 = strncpy(line->value0, code+(line->instructionLen+1), line->value0Len);
+	line->value1Len = strcspn(code+(line->instructionLen+1+line->value0Len+2), " ");
+	line->value1 = calloc(1, sizeof(char)*line->value1Len);
+	line->value1 = strncpy(line->value1, code+(line->instructionLen+1+line->value0Len+2), line->value1Len);
+	return line;
+}
+
+uint32_t SDMSTFindInputRegisters(SDMDisasm disasm, char *code) {
+	uint32_t result = 0;
+	SDMSTInputRegisterType *inputRegArray = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? kIntelInputRegs : kARMInputRegs);
+	uint32_t inputRegArrayCount = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? kIntelInputRegsCount : kARMInputRegsCount);
+	SDMSTParsedLine *line = SDMSTParse(code);
+	if (line->value1Len) {
+		for (uint32_t i = 0; i < inputRegArrayCount; i++) {
+			if (strstr(line->value1, inputRegArray[i].name)) {
+				result = inputRegArray[i].number+1;
+			}
+		}
+	}
+	free(line);
+	return result;
+}
+
 uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t argumentCount = 0x0;
 	if (functionPointer) {
 		uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
 			struct SDMDisasm disasm = SDM_disasm_init((struct mach_header *)(libTable->libInfo->mhOffset));
 			SDM_disasm_setbuffer(&disasm, functionPointer, functionLength);
-			while (ud_disassemble(&disasm.handler.obj)) {
+			ud_t obj;
+			ud_init(&obj);
+			ud_set_mode(&obj, (disasm.is64Bit? 0x40 : 0x20));
+			ud_set_syntax(&obj, UD_SYN_INTEL);
+			ud_set_input_buffer(&obj, functionPointer, functionLength);
+			bool *inputRegisters;
+			while (ud_disassemble(&obj)) {
 				if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
-					char *code = (char*)ud_insn_asm(&(disasm.handler.obj));
-					printf("%s\n",code);
-					/*for (uint32_t i = 0x0; i < kIntelInputRegsCount; i++) {
-						char *offset = strstr(code, kIntelInputRegs[i].name);
-						if (offset && strlen(offset) == strlen(kIntelInputRegs[i].name))
-							inputRegisters[kIntelInputRegs[i].number] = true;
-					}*/
+					char *code = (char*)ud_insn_asm(&obj);
+					uint32_t count = SDMSTFindInputRegisters(disasm, code);
+					if (count > argumentCount)
+						argumentCount = count;
 					if (strcmp(code, "ret")==0x0)
 						break;
 				} else if (disasm.arch == ARMv6Arch || disasm.arch == ARMv7Arch) {
 
 				}
 			}
-		if (libTable->libInfo->arch.type == CPU_TYPE_I386 || libTable->libInfo->arch.type == CPU_TYPE_X86_64) {
-			bool inputRegisters[kIntelInputRegsCount] = false;
-			for (uint32_t i = 0x0; i < kIntelInputRegsCount; i++)
-				if (inputRegisters[i])
-					argumentCount = kIntelInputRegs[i].number+1;
-		} else if (libTable->libInfo->arch.type == CPU_TYPE_ARM) {
-			bool inputRegisters[kARMInputRegsCount] = false;
+		if (libTable->libInfo->arch.type == CPU_TYPE_ARM) {
+			bool inputRegisters[kARMInputRegsCount] = {false, false, false, false};
 			if (libTable->libInfo->arch.subtype == CPU_SUBTYPE_ARM_V6) {
 				
 			} else if (libTable->libInfo->arch.subtype == CPU_SUBTYPE_ARM_V7) {

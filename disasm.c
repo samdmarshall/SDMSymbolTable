@@ -21,42 +21,6 @@
 
 #include "disasm.h"
 
-typedef struct SDMSTInputRegisterType {
-	char *name;
-	uint32_t number;
-} __attribute__ ((packed)) SDMSTInputRegisterType;
-
-typedef struct IntelInstruction {
-	char *data;
-} __attribute__ ((packed)) IntelInstruction;
-
-#pragma mark -
-#pragma mark Constants
-
-static SDMSTInputRegisterType kIntelInputRegs[kIntelInputRegsCount] = {
-	{"rdi\0", 0x0},
-	{"rsi\0", 0x1},
-	{"rdx\0", 0x2},
-	{"rcx\0", 0x3},
-	{"r8\0", 0x4},
-	{"r9\0", 0x5},
-	{"xmm0\0", 0x6},
-	{"xmm1\0", 0x7},
-	{"xmm2\0", 0x8},
-	{"xmm3\0", 0x9},
-	{"xmm4\0", 0xa},
-	{"xmm5\0", 0xb},
-	{"xmm6\0", 0xc},
-	{"xmm7\0", 0xd}
-};
-
-static SDMSTInputRegisterType kARMInputRegs[kARMInputRegsCount] = {
-	{"r0\0", 0x0},
-	{"r1\0", 0x1},
-	{"r2\0", 0x2},
-	{"r3\0", 0x3}
-};
-
 CPUArchitecture SDM_disasm_get_arch(cpu_type_t type, cpu_subtype_t subtype) {
 	switch (type) {
 		case CPU_TYPE_I386: {
@@ -97,9 +61,9 @@ SDMDisasm SDM_disasm_init(struct mach_header *header) {
 	disasm.is64Bit = ((header->magic == MH_MAGIC_64 || header->magic == MH_CIGAM_64) ? true : false);
 	disasm.endian = SDM_disasm_get_endian(disasm.arch);
 	if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
-		ud_init(&disasm.handler.obj);
-		ud_set_mode(&disasm.handler.obj, (disasm.is64Bit? 0x40 : 0x20));
-		ud_set_syntax(&disasm.handler.obj, UD_SYN_INTEL);
+		ud_init(&disasm.obj);
+		ud_set_mode(&disasm.obj, (disasm.is64Bit? 0x40 : 0x20));
+		ud_set_syntax(&disasm.obj, UD_SYN_INTEL);
 	} else if (disasm.arch == ARMv6Arch || disasm.arch == ARMv7Arch) {
 		
 	}
@@ -108,7 +72,7 @@ SDMDisasm SDM_disasm_init(struct mach_header *header) {
 
 void SDM_disasm_setbuffer(SDMDisasm *disasm, uint32_t *buffer, uint32_t length) {
 	if (disasm->arch == i386Arch || disasm->arch == x86_64Arch) {
-		ud_set_input_buffer(&disasm->handler.obj, buffer, length);
+		ud_set_input_buffer(&disasm->obj, (uint8_t*)buffer, length);
 	} else if (disasm->arch == ARMv6Arch || disasm->arch == ARMv7Arch) {
 		disasm->handler.arm = (SDMDisasmObject){buffer, length, 0x0};
 	}
@@ -122,7 +86,7 @@ ARMInstruction SDM_disasm_arm(uint32_t instruction) {
 
 uint32_t SDM_disasm_parse(SDMDisasm disasm) {
 	if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
-		return ud_disassemble(&(disasm.handler.obj));
+		return ud_disassemble(&disasm.obj);
 	} else if (disasm.arch == ARMv6Arch || disasm.arch == ARMv7Arch) {
 		if (disasm.handler.arm.remainder - 1 > 0) {
 			uint32_t data = disasm.handler.arm.buffer[disasm.handler.arm.length-disasm.handler.arm.remainder];
