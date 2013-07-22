@@ -302,6 +302,7 @@ void SDMSTSetFunctionArgs(struct SDMSTFunction *function, ...) {
 struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function) {
 	struct SDMSTFunctionReturn *result = (struct SDMSTFunctionReturn*)calloc(0x1, sizeof(struct SDMSTFunctionReturn));
 	result->function = function;
+	result->value = 0xdeadbeef;
 	result->value = function->offset(function->args);
 	return result;
 }
