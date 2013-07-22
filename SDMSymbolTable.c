@@ -206,28 +206,28 @@ uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* 
 }
 
 SDMSTParsedLine* SDMSTParse(char *code) {
-	SDMSTParsedLine *line = calloc(1, sizeof(SDMSTParsedLine));
+	SDMSTParsedLine *line = calloc(0x1, sizeof(SDMSTParsedLine));
 	line->instructionLen = strcspn(code, " ");
-	line->instruction = calloc(1, sizeof(char)*line->instructionLen);
+	line->instruction = calloc(0x1, sizeof(char)*line->instructionLen);
 	line->instruction = strncpy(line->instruction, code, line->instructionLen);
-	line->value0Len = strcspn(code+(line->instructionLen+1), ", ");
-	line->value0 = calloc(1, sizeof(char)*line->value0Len);
-	line->value0 = strncpy(line->value0, code+(line->instructionLen+1), line->value0Len);
-	line->value1Len = strcspn(code+(line->instructionLen+1+line->value0Len+2), " ");
-	line->value1 = calloc(1, sizeof(char)*line->value1Len);
-	line->value1 = strncpy(line->value1, code+(line->instructionLen+1+line->value0Len+2), line->value1Len);
+	line->value0Len = strcspn(code+(line->instructionLen+0x1), ", ");
+	line->value0 = calloc(0x1, sizeof(char)*line->value0Len);
+	line->value0 = strncpy(line->value0, code+(line->instructionLen+0x1), line->value0Len);
+	line->value1Len = strcspn(code+(line->instructionLen+0x1+line->value0Len+0x2), " ");
+	line->value1 = calloc(0x1, sizeof(char)*line->value1Len);
+	line->value1 = strncpy(line->value1, code+(line->instructionLen+0x1+line->value0Len+0x2), line->value1Len);
 	return line;
 }
 
 uint32_t SDMSTFindInputRegisters(SDMDisasm disasm, char *code) {
-	uint32_t result = 0;
+	uint32_t result = 0x0;
 	SDMSTInputRegisterType *inputRegArray = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? (SDMSTInputRegisterType*)kIntelInputRegs : (SDMSTInputRegisterType*)kARMInputRegs);
 	uint32_t inputRegArrayCount = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? kIntelInputRegsCount : kARMInputRegsCount);
 	SDMSTParsedLine *line = SDMSTParse(code);
 	if (line->value1Len) {
-		for (uint32_t i = 0; i < inputRegArrayCount; i++) {
+		for (uint32_t i = 0x0; i < inputRegArrayCount; i++) {
 			if (strstr(line->value1, inputRegArray[i].name)) {
-				result = inputRegArray[i].number+1;
+				result = inputRegArray[i].number+0x1;
 			}
 		}
 	}
@@ -267,7 +267,7 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 			}
 			for (uint32_t i = 0x0; i < kARMInputRegsCount; i++)
 				if (inputRegisters[i])
-					argumentCount = kARMInputRegs[i].number+1;
+					argumentCount = kARMInputRegs[i].number+0x1;
 		}
 	}
 	return argumentCount;
@@ -291,9 +291,13 @@ struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTab
 	return function;
 }
 
+void SDMSTSetFunctionArgsCount(struct SDMSTFunction *function, uint32_t count) {
+	function->argc = count;
+}
+
 void SDMSTSetFunctionArgs(struct SDMSTFunction *function, ...) {
 	va_start(function->args, function);
-	for (uint32_t i = 0; i < function->argc; i++) {
+	for (uint32_t i = 0x0; i < function->argc; i++) {
 		va_arg(function->args, uintptr_t);
 	}
 	va_end(function->args);
