@@ -85,16 +85,21 @@ ARMInstruction SDM_disasm_arm(uint32_t instruction) {
 }
 
 uint32_t SDM_disasm_parse(SDMDisasm disasm) {
+	uint32_t result = 0x0;
 	if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
-		return ud_disassemble(&disasm.obj);
+		result = ud_disassemble(&disasm.obj);
 	} else if (disasm.arch == ARMv6Arch || disasm.arch == ARMv7Arch) {
 		if (disasm.handler.arm.remainder - 1 > 0) {
 			uint32_t data = disasm.handler.arm.buffer[disasm.handler.arm.length-disasm.handler.arm.remainder];
 			ARMInstruction instruction = SDM_disasm_arm(data);
+			if (instruction.cc) {
+				
+			}
 			disasm.handler.arm.remainder--;
 		}
-		return disasm.handler.arm.remainder;
+		result = disasm.handler.arm.remainder;
 	}
+	return result;
 }
 
 #endif

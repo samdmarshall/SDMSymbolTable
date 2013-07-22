@@ -49,7 +49,7 @@ typedef struct IntelInstruction {
 
 #define kARMInputRegsCount 0x4
 
-static SDMSTInputRegisterType kIntelInputRegs[kIntelInputRegsCount] = {
+static const SDMSTInputRegisterType kIntelInputRegs[kIntelInputRegsCount] = {
 	{"rdi\0", 0x0},
 	{"rsi\0", 0x1},
 	{"rdx\0", 0x2},
@@ -66,7 +66,7 @@ static SDMSTInputRegisterType kIntelInputRegs[kIntelInputRegsCount] = {
 	{"xmm7\0", 0xd}
 };
 
-static SDMSTInputRegisterType kARMInputRegs[kARMInputRegsCount] = {
+static const SDMSTInputRegisterType kARMInputRegs[kARMInputRegsCount] = {
 	{"r0\0", 0x0},
 	{"r1\0", 0x1},
 	{"r2\0", 0x2},

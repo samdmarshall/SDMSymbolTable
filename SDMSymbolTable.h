@@ -26,6 +26,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <mach-o/loader.h>
+#include <stdarg.h>
 
 #pragma mark -
 #pragma mark Types
@@ -36,7 +37,7 @@ typedef struct SDMSTFunction {
 	char *name;
 	SDMSTFunctionCall offset;
 	uint32_t argc;
-	uintptr_t *argv;
+	va_list args;
 } __attribute__ ((packed)) SDMSTFunction;
 
 struct SDMSTFunctionReturn {

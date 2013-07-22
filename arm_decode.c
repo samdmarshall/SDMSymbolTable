@@ -21,6 +21,8 @@
 
 #include "arm_decode.h"
 #include <math.h>
+#include <string.h>
+#include <stdlib.h>
 
 #pragma mark -
 #pragma mark ARM
@@ -388,7 +390,7 @@ static THUMB_16_OpCode THUMB_16_LoadMultiTable[3] = {
 	{2,"ldmfd"}
 };
 
-static THUMB_16_OpCode *THUMB_16_MasterTable[7] = {
+static THUMB_16_OpCode *THUMB_16_MasterTable[10] = {
 	THUMB_16_BasicLogicTable,
 	THUMB_16_DataProcessingTable,
 	THUMB_16_SpeciaDataTable,
@@ -422,8 +424,9 @@ THUMB_16_OpCode arm_decode_opcode(uint32_t data) {
 		}
 		return THUMB_16_MasterTable[tableNum][opcode];
 	} else if (THUMB_Is32Bit(data)) {
-		return;
+		
 	}
+	return (THUMB_16_OpCode){0, NULL};
 }
 
 char* arm_decode_thumb_16_registers(THUMB_16_OpCode code, uint32_t data) {

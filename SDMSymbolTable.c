@@ -221,7 +221,7 @@ SDMSTParsedLine* SDMSTParse(char *code) {
 
 uint32_t SDMSTFindInputRegisters(SDMDisasm disasm, char *code) {
 	uint32_t result = 0;
-	SDMSTInputRegisterType *inputRegArray = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? kIntelInputRegs : kARMInputRegs);
+	SDMSTInputRegisterType *inputRegArray = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? (SDMSTInputRegisterType*)kIntelInputRegs : (SDMSTInputRegisterType*)kARMInputRegs);
 	uint32_t inputRegArrayCount = (disasm.arch == i386Arch || disasm.arch == x86_64Arch ? kIntelInputRegsCount : kARMInputRegsCount);
 	SDMSTParsedLine *line = SDMSTParse(code);
 	if (line->value1Len) {
@@ -246,7 +246,6 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 			ud_set_mode(&obj, (disasm.is64Bit? 0x40 : 0x20));
 			ud_set_syntax(&obj, UD_SYN_INTEL);
 			ud_set_input_buffer(&obj, functionPointer, functionLength);
-			bool *inputRegisters;
 			while (ud_disassemble(&obj)) {
 				if (disasm.arch == i386Arch || disasm.arch == x86_64Arch) {
 					char *code = (char*)ud_insn_asm(&obj);
@@ -289,37 +288,25 @@ struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTab
 	function->name = name;
 	function->offset = SDMSTSymbolLookup(libTable, name);
 	function->argc = SDMSTGetArgumentCount(libTable, function->offset);
-	function->argv = (uintptr_t*)calloc(0xe, sizeof(uintptr_t));
 	return function;
+}
+
+void SDMSTSetFunctionArgs(struct SDMSTFunction *function, ...) {
+	va_start(function->args, function);
+	for (uint32_t i = 0; i < function->argc; i++) {
+		va_arg(function->args, uintptr_t);
+	}
+	va_end(function->args);
 }
 
 struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function) {
 	struct SDMSTFunctionReturn *result = (struct SDMSTFunctionReturn*)calloc(0x1, sizeof(struct SDMSTFunctionReturn));
 	result->function = function;
-	result->value = NULL;
-	switch (function->argc) {
-		case 0: result->value = function->offset(); break;
-		case 1: result->value = function->offset(function->argv[0]); break;
-		case 2: result->value = function->offset(function->argv[0], function->argv[1]); break;
-		case 3: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2]); break;
-		case 4: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3]); break;
-		case 5: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4]); break;
-		case 6: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5]); break;
-		case 7: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6]); break;
-		case 8: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7]); break;
-		case 9: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8]); break;
-		case 10: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9]); break;
-		case 11: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10]); break;
-		case 12: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11]); break;
-		case 13: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11], function->argv[12]); break;
-		case 14: result->value = function->offset(function->argv[0], function->argv[1], function->argv[2], function->argv[3], function->argv[4], function->argv[5], function->argv[6], function->argv[7], function->argv[8], function->argv[9], function->argv[10], function->argv[11], function->argv[12], function->argv[13]); break;
-		default: break;
-	}
+	result->value = function->offset(function->args);
 	return result;
 }
 
 void SDMSTFunctionRelease(struct SDMSTFunction *function) {
-	free(function->argv);
 	free(function);
 }
 
