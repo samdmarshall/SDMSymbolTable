@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		227985F417A9B71600985DEF /* SDMMachO.c in Sources */ = {isa = PBXBuildFile; fileRef = 227985F317A9B71600985DEF /* SDMMachO.c */; };
+		2279867E17AB00D100985DEF /* SDMSymbolCall.s in Sources */ = {isa = PBXBuildFile; fileRef = 2279867D17AB00D100985DEF /* SDMSymbolCall.s */; };
 		22D5F544179DC1C900C34745 /* arm_decode.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F516179DC1C900C34745 /* arm_decode.c */; };
 		22D5F546179DC1C900C34745 /* disasm.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F52E179DC1C900C34745 /* disasm.c */; };
 		22D5F547179DC1C900C34745 /* decode.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F531179DC1C900C34745 /* decode.c */; };
@@ -17,6 +19,7 @@
 		22D5F54C179DC1C900C34745 /* syn.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F53A179DC1C900C34745 /* syn.c */; };
 		22D5F54D179DC1C900C34745 /* udis86.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F53E179DC1C900C34745 /* udis86.c */; };
 		22D5F54E179DC1C900C34745 /* SDMSymbolTable.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F541179DC1C900C34745 /* SDMSymbolTable.c */; };
+		22D5F75B17A035B500C34745 /* SDMPESymbolTable.c in Sources */ = {isa = PBXBuildFile; fileRef = 22D5F75A17A035B500C34745 /* SDMPESymbolTable.c */; };
 		8DD76FAC0486AB0100D96B5E /* main.c in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7796FE84155DC02AAC07 /* main.c */; settings = {ATTRIBUTES = (); }; };
 		8DD76FB00486AB0100D96B5E /* Demo.1 in CopyFiles */ = {isa = PBXBuildFile; fileRef = C6A0FF2C0290799A04C91782 /* Demo.1 */; };
 /* End PBXBuildFile section */
@@ -36,6 +39,10 @@
 
 /* Begin PBXFileReference section */
 		08FB7796FE84155DC02AAC07 /* main.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = main.c; sourceTree = "<group>"; };
+		227984B017A99BF400985DEF /* Calculator */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.executable"; name = Calculator; path = /Volumes/Data/Users/sam/Desktop/Calculator; sourceTree = "<absolute>"; };
+		227985F217A9B71600985DEF /* SDMMachO.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDMMachO.h; sourceTree = "<group>"; };
+		227985F317A9B71600985DEF /* SDMMachO.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SDMMachO.c; sourceTree = "<group>"; };
+		2279867D17AB00D100985DEF /* SDMSymbolCall.s */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.asm; path = SDMSymbolCall.s; sourceTree = "<group>"; };
 		22D5F516179DC1C900C34745 /* arm_decode.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = arm_decode.c; sourceTree = "<group>"; };
 		22D5F517179DC1C900C34745 /* arm_decode.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = arm_decode.h; sourceTree = "<group>"; };
 		22D5F52E179DC1C900C34745 /* disasm.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = disasm.c; sourceTree = "<group>"; };
@@ -59,6 +66,8 @@
 		22D5F541179DC1C900C34745 /* SDMSymbolTable.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SDMSymbolTable.c; sourceTree = "<group>"; };
 		22D5F542179DC1C900C34745 /* SDMSymbolTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDMSymbolTable.h; sourceTree = "<group>"; };
 		22D5F543179DC1C900C34745 /* udis86.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = udis86.h; sourceTree = "<group>"; };
+		22D5F75917A035B500C34745 /* SDMPESymbolTable.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = SDMPESymbolTable.h; sourceTree = "<group>"; };
+		22D5F75A17A035B500C34745 /* SDMPESymbolTable.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; path = SDMPESymbolTable.c; sourceTree = "<group>"; };
 		8DD76FB20486AB0100D96B5E /* Demo */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = Demo; sourceTree = BUILT_PRODUCTS_DIR; };
 		C6A0FF2C0290799A04C91782 /* Demo.1 */ = {isa = PBXFileReference; lastKnownFileType = text.man; path = Demo.1; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -81,6 +90,7 @@
 				08FB7795FE84155DC02AAC07 /* Source */,
 				C6A0FF2B0290797F04C91782 /* Documentation */,
 				1AB674ADFE9D54B511CA2CBB /* Products */,
+				227984B017A99BF400985DEF /* Calculator */,
 			);
 			name = Demo;
 			sourceTree = "<group>";
@@ -114,6 +124,11 @@
 				22D5F541179DC1C900C34745 /* SDMSymbolTable.c */,
 				22D5F542179DC1C900C34745 /* SDMSymbolTable.h */,
 				22D5F543179DC1C900C34745 /* udis86.h */,
+				22D5F75917A035B500C34745 /* SDMPESymbolTable.h */,
+				22D5F75A17A035B500C34745 /* SDMPESymbolTable.c */,
+				227985F217A9B71600985DEF /* SDMMachO.h */,
+				227985F317A9B71600985DEF /* SDMMachO.c */,
+				2279867D17AB00D100985DEF /* SDMSymbolCall.s */,
 			);
 			name = SDMSymbolTable;
 			path = ..;
@@ -209,6 +224,9 @@
 				22D5F54C179DC1C900C34745 /* syn.c in Sources */,
 				22D5F54D179DC1C900C34745 /* udis86.c in Sources */,
 				22D5F54E179DC1C900C34745 /* SDMSymbolTable.c in Sources */,
+				22D5F75B17A035B500C34745 /* SDMPESymbolTable.c in Sources */,
+				227985F417A9B71600985DEF /* SDMMachO.c in Sources */,
+				2279867E17AB00D100985DEF /* SDMSymbolCall.s in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

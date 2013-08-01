@@ -1,5 +1,5 @@
 /*
- *  SDMSymbolTable.h
+ *  SDMPESymbolTable.h
  *  SDMSymbolTable
  *
  *  Copyright (c) 2013, Sam Marshall
@@ -16,9 +16,8 @@
  * 
  */
 
-
-#ifndef _SDMSYMBOLTABLE_H_
-#define _SDMSYMBOLTABLE_H_
+#ifndef _SDMPESYMBOLTABLE_H_
+#define _SDMPESYMBOLTABLE_H_
 
 #pragma mark -
 #pragma mark Includes
@@ -26,76 +25,49 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdarg.h>
-
-#include <mach-o/loader.h>
-
+#include <stdio.h>
 
 #pragma mark -
 #pragma mark Types
 
-typedef void* (*SDMSTFunctionCall)();
+struct SDMPEOptionalHeader {
+	bool hasHeader;
+	uint16_t headerSize;
+} __attribute__ ((packed)) SDMPEOptionalHeader;
 
-typedef struct SDMSTFunction {
-	char *name;
-	SDMSTFunctionCall offset;
-	uint32_t argc;
-	uintptr_t *args;
-} __attribute__ ((packed)) SDMSTFunction;
+struct SDMPELibraryTableInfo {
+	uint16_t machineType;
+	uintptr_t* header;
+	uint16_t sectionCount;
+	uintptr_t* symbolTable;
+	uint32_t symbolTotal;
+	struct SDMPEOptionalHeader *altHeader;
+	uint16_t characteristics;
+} SDMPELibraryTableInfo;
 
-struct SDMSTFunctionReturn {
-	struct SDMSTFunction *function;
-	void* value;
-} __attribute__ ((packed)) SDMSTFunctionReturn;
-
-typedef struct SDMSTSegmentEntry {
-	uint32_t cmd;
-	uint32_t cmdsize;
-	char segname[0x10];
-} __attribute__ ((packed)) SDMSTSegmentEntry;
-
-typedef struct SDMSTLibraryArchitecture {
-	cpu_type_t type;
-	cpu_subtype_t subtype;
-} __attribute__ ((packed)) SDMSTLibraryArchitecture;
-
-typedef struct SDMSTLibraryTableInfo {
-	uint32_t imageNumber;
-	uintptr_t *mhOffset;
-	struct SDMSTSegmentEntry *textSeg;
-	struct SDMSTSegmentEntry *linkSeg;
-	struct symtab_command *symtabCommands;
-	uint32_t symtabCount;
-	uint32_t headerMagic;
-	bool is64bit;
-	struct SDMSTLibraryArchitecture arch;
-} __attribute__ ((packed)) SDMSTLibraryTableInfo;
-
-typedef struct SDMSTMachOSymbol {
+struct SDMPESymbol {
 	uint32_t tableNumber;
 	uint32_t symbolNumber;
 	void* offset;
 	char *name;
-	bool isStub;
-} __attribute__ ((packed)) SDMSTMachOSymbol;
+} __attribute__ ((packed)) SDMPESymbol;
 
-typedef struct SDMMOLibrarySymbolTable {
-	bool couldLoad;
+struct SDMPELibrary {
+	char *handle;
+	uint32_t size;
+} __attribute__ ((packed)) SDMPELibrary;
+
+typedef struct SDMPELibrarySymbolTable {
 	char *libraryPath;
-	uintptr_t* libraryHandle;
-	uint64_t librarySize;
-	struct SDMSTLibraryTableInfo *libInfo;
-	struct SDMSTMachOSymbol *table;
+	struct SDMPELibrary *library;
+	struct SDMPELibraryTableInfo *libInfo;
+	struct SDMPESymbol *table;
 	uint32_t symbolCount;
-} __attribute__ ((packed)) SDMMOLibrarySymbolTable;
+} __attribute__ ((packed)) SDMPELibrarySymbolTable;
 
 #pragma mark -
 #pragma mark Declarations
 
-struct SDMMOLibrarySymbolTable* SDMSTLoadLibrary(char *path);
-struct SDMSTFunction* SDMSTCreateFunction(struct SDMMOLibrarySymbolTable *libTable, char *name);
-struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMMOLibrarySymbolTable *libTable, struct SDMSTFunction *function);
-void SDMSTFunctionRelease(struct SDMSTFunction *function);
-void SDMSTFunctionReturnRelease(struct SDMSTFunctionReturn *functionReturn);
-void SDMSTLibraryRelease(struct SDMMOLibrarySymbolTable *libTable);
+struct SDMPELibrarySymbolTable* SDMSTLoadLibraryPE(char *path);
 
 #endif

@@ -22,62 +22,51 @@
 #pragma mark -
 #pragma mark Includes
 #include "SDMSymbolTable.h"
+#include <sys/stat.h>
+#include <sys/mman.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <mach/mach.h>
 #include <mach-o/dyld.h>
 #include <mach-o/nlist.h>
 #include <mach-o/ldsyms.h>
+#include <math.h>
 #include "disasm.h"
-
-#pragma mark -
-#pragma mark Internal Types
-
-typedef struct SDMSTSymbolTableListEntry {
-	union {
-	   uint32_t n_strx;
-	} n_un;
-	uint8_t n_type;
-	uint8_t n_sect;
-	uint16_t n_desc;
-} __attribute__ ((packed)) SDMSTSymbolTableListEntry;
-
-typedef struct SDMSTSeg32Data {
-	uint32_t vmaddr;
-	uint32_t vmsize;
-	uint32_t fileoff;
-} __attribute__ ((packed)) SDMSTSeg32Data;
-
-typedef struct SDMSTSeg64Data {
-	uint64_t vmaddr;
-	uint64_t vmsize;
-	uint64_t fileoff;
-} __attribute__ ((packed)) SDMSTSeg64Data;
+#include "SDMMachO.h"
 
 #pragma mark -
 #pragma mark Declarations
 
-void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable);
+void SDMSTBuildLibraryInfo(SDMMOLibrarySymbolTable *libTable);
 int SDMSTCompareTableEntries(const void *entry1, const void *entry2);
-void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable);
+void SDMSTGenerateSortedSymbolTable(struct SDMMOLibrarySymbolTable *libTable);
 bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName);
-uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
-uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer);
-SDMSTFunctionCall SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName);
+uint32_t SDMSTGetFunctionLength(struct SDMMOLibrarySymbolTable *libTable, void* functionPointer);
+uint32_t SDMSTGetArgumentCount(struct SDMMOLibrarySymbolTable *libTable, void* functionPointer);
+SDMSTFunctionCall SDMSTSymbolLookup(struct SDMMOLibrarySymbolTable *libTable, char *symbolName);
+
+extern void* makeDynamicCallWithIntList(uint32_t argc, void* argv, void* functionPointer);
 
 #pragma mark -
 #pragma mark Functions
 
-void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
+void SDMSTBuildLibraryInfo(SDMMOLibrarySymbolTable *libTable) {
 	if (libTable->libInfo == NULL) {
 		libTable->libInfo = (struct SDMSTLibraryTableInfo *)calloc(0x1, sizeof(struct SDMSTLibraryTableInfo));
-		uint32_t count = _dyld_image_count();
-		for (uint32_t i = 0x0; i < count; i++) {
-			if (strcmp(_dyld_get_image_name(i), libTable->libraryPath) == 0x0) {
-				libTable->libInfo->imageNumber = i;
-				break;
+		const struct mach_header *imageHeader;
+		if (libTable->couldLoad) {
+			uint32_t count = _dyld_image_count();
+			for (uint32_t i = 0x0; i < count; i++) {
+				if (strcmp(_dyld_get_image_name(i), libTable->libraryPath) == 0x0) {
+					libTable->libInfo->imageNumber = i;
+					break;
+				}
 			}
+			imageHeader = _dyld_get_image_header(libTable->libInfo->imageNumber);
+		} else {
+			imageHeader = (struct mach_header *)libTable->libraryHandle;
 		}
-		const struct mach_header *imageHeader = _dyld_get_image_header(libTable->libInfo->imageNumber);
 		libTable->libInfo->headerMagic = imageHeader->magic;
 		libTable->libInfo->arch = (struct SDMSTLibraryArchitecture){imageHeader->cputype, imageHeader->cpusubtype};
 		libTable->libInfo->is64bit = ((imageHeader->cputype == CPU_TYPE_X86_64 || imageHeader->cputype == CPU_TYPE_POWERPC64) && (libTable->libInfo->headerMagic == MH_MAGIC_64 || libTable->libInfo->headerMagic == MH_CIGAM_64) ? true : false);
@@ -103,6 +92,10 @@ void SDMSTBuildLibraryInfo(SDMSTLibrarySymbolTable *libTable) {
 						libTable->libInfo->linkSeg = (struct SDMSTSegmentEntry *)seg;
 					}
 				}
+				if (loadCmd->cmd == LC_LOAD_DYLIB) {
+					struct dylib_command *linkedLibrary = (struct dylib_command *)loadCmd;
+					printf("%s\n",(char*)loadCmd+linkedLibrary->dylib.name.offset);
+				}
 				loadCmd = (struct load_command *)((char*)loadCmd + loadCmd->cmdsize);
 			}
 		}
@@ -116,7 +109,7 @@ int SDMSTCompareTableEntries(const void *entry1, const void *entry2) {
 	return -0;
 }
 
-void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
+void SDMSTGenerateSortedSymbolTable(struct SDMMOLibrarySymbolTable *libTable) {
 	if (libTable->table == NULL) {
 		void* symbolAddress = 0x0;
 		libTable->table = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
@@ -152,8 +145,14 @@ void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
 					struct SDMSTMachOSymbol *aSymbol = (struct SDMSTMachOSymbol *)calloc(0x1, sizeof(struct SDMSTMachOSymbol));
 					aSymbol->tableNumber = i;
 					aSymbol->symbolNumber = j;
-					aSymbol->offset = (void*)symbolAddress + _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber);
-					aSymbol->name = ((char *)strTable + entry->n_un.n_strx);
+					aSymbol->offset = (void*)symbolAddress + (libTable->couldLoad ? _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber) : 0);
+					aSymbol->isStub = !entry->n_un.n_strx;
+					if (entry->n_un.n_strx) {
+						aSymbol->name = ((char *)strTable + entry->n_un.n_strx);
+					} else {
+						aSymbol->name = calloc(14+((libTable->symbolCount==0) ? 1 : (uint32_t)log10(libTable->symbolCount) + 1), sizeof(char));
+						sprintf(aSymbol->name, "__sdmst_stub_%i", libTable->symbolCount);
+					}
 					libTable->table[libTable->symbolCount] = *aSymbol;
 					libTable->symbolCount++;
 				}
@@ -164,9 +163,31 @@ void SDMSTGenerateSortedSymbolTable(struct SDMSTLibrarySymbolTable *libTable) {
 	}
 }
 
-struct SDMSTLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
-	struct SDMSTLibrarySymbolTable *table = (struct SDMSTLibrarySymbolTable *)calloc(0x1, sizeof(struct SDMSTLibrarySymbolTable));
+struct SDMMOLibrarySymbolTable* SDMSTLoadLibrary(char *path) {
+	struct SDMMOLibrarySymbolTable *table = (struct SDMMOLibrarySymbolTable *)calloc(0x1, sizeof(struct SDMMOLibrarySymbolTable));
 	void* handle = dlopen(path, RTLD_LOCAL);
+	if (!handle) {
+		printf("[%s] Unable to load library: %s\n", path, dlerror());
+		printf("Attempting to manually load and map...\n");
+		table->couldLoad = FALSE;
+		struct stat fs;
+		stat(path, &fs);
+		int fd = open(path, O_RDONLY);
+		uint32_t header = 0xdeadbeef;
+		read(fd, &header, sizeof(uint32_t));
+		uint32_t size = fs.st_size;
+		uint32_t offset = 0;
+		if (header == 0xbebafeca) {
+			size -= 4096;
+			offset += 4096;
+		}
+		handle = mmap(NULL, size, PROT_READ, MAP_PRIVATE, fd, offset);
+		close(fd);
+		table->librarySize = 0;
+	} else {
+		table->couldLoad = TRUE;
+		table->librarySize = 0;
+	}
 	if (handle) {
 		table->libraryPath = path;
 		table->libraryHandle = handle;
@@ -196,7 +217,7 @@ bool SMDSTSymbolDemangleAndCompare(char *symFromTable, char *symbolName) {
 	return matchesName;
 }
 
-uint32_t SDMSTGetFunctionLength(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
+uint32_t SDMSTGetFunctionLength(struct SDMMOLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t nextOffset = 0xffffffff;
 	for (uint32_t i = 0x0; i < libTable->symbolCount; i++)
 		if (functionPointer < libTable->table[i].offset)
@@ -235,7 +256,7 @@ uint32_t SDMSTFindInputRegisters(SDMDisasm disasm, char *code) {
 	return result;
 }
 
-uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* functionPointer) {
+uint32_t SDMSTGetArgumentCount(struct SDMMOLibrarySymbolTable *libTable, void* functionPointer) {
 	uint32_t argumentCount = 0x0;
 	if (functionPointer) {
 		uint32_t functionLength = SDMSTGetFunctionLength(libTable, functionPointer);
@@ -273,7 +294,7 @@ uint32_t SDMSTGetArgumentCount(struct SDMSTLibrarySymbolTable *libTable, void* f
 	return argumentCount;
 }
 
-SDMSTFunctionCall SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, char *symbolName) {
+SDMSTFunctionCall SDMSTSymbolLookup(struct SDMMOLibrarySymbolTable *libTable, char *symbolName) {
 	void* symbolAddress = 0x0;
 	for (uint32_t i = 0x0; i < libTable->symbolCount; i++)
 		if (SMDSTSymbolDemangleAndCompare(libTable->table[i].name, symbolName)) {
@@ -283,7 +304,7 @@ SDMSTFunctionCall SDMSTSymbolLookup(struct SDMSTLibrarySymbolTable *libTable, ch
 	return symbolAddress;
 }
 
-struct SDMSTFunction* SDMSTCreateFunction(struct SDMSTLibrarySymbolTable *libTable, char *name) {
+struct SDMSTFunction* SDMSTCreateFunction(struct SDMMOLibrarySymbolTable *libTable, char *name) {
 	struct SDMSTFunction *function = (struct SDMSTFunction*)calloc(0x1, sizeof(struct SDMSTFunction));
 	function->name = name;
 	function->offset = SDMSTSymbolLookup(libTable, name);
@@ -296,18 +317,21 @@ void SDMSTSetFunctionArgsCount(struct SDMSTFunction *function, uint32_t count) {
 }
 
 void SDMSTSetFunctionArgs(struct SDMSTFunction *function, ...) {
-	va_start(function->args, function);
+	va_list args;
+	va_start(args, function);
+	function->args = calloc(function->argc, sizeof(uintptr_t));
 	for (uint32_t i = 0x0; i < function->argc; i++) {
-		va_arg(function->args, uintptr_t);
+		function->args[i] = va_arg(args, uintptr_t);
 	}
-	va_end(function->args);
+	va_end(args);
 }
 
-struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMSTLibrarySymbolTable *libTable, struct SDMSTFunction *function) {
+struct SDMSTFunctionReturn* SDMSTCallFunction(struct SDMMOLibrarySymbolTable *libTable, struct SDMSTFunction *function) {
 	struct SDMSTFunctionReturn *result = (struct SDMSTFunctionReturn*)calloc(0x1, sizeof(struct SDMSTFunctionReturn));
 	result->function = function;
 	result->value = (void*)0xdeadbeef;
-	result->value = function->offset(function->args);
+	result->value = makeDynamicCallWithIntList(function->argc, function->args, function->offset);
+	//result->value = function->offset(function->args);
 	return result;
 }
 
@@ -320,10 +344,17 @@ void SDMSTFunctionReturnRelease(struct SDMSTFunctionReturn *functionReturn) {
 	free(functionReturn);
 }
 
-void SDMSTLibraryRelease(struct SDMSTLibrarySymbolTable *libTable) {
+void SDMSTLibraryRelease(struct SDMMOLibrarySymbolTable *libTable) {
 	free(libTable->libInfo);
+	for (uint32_t i = 0; i < libTable->symbolCount; i++) {
+		if (libTable->table[i].isStub)
+			free(libTable->table[i].name);
+	}
 	free(libTable->table);
-	dlclose(libTable->libraryHandle);
+	if (libTable->couldLoad)
+		dlclose(libTable->libraryHandle);
+	else
+		munmap(libTable->libraryHandle, libTable->librarySize);
 	free(libTable);
 }
 
