@@ -94,7 +94,9 @@ void SDMSTBuildLibraryInfo(SDMMOLibrarySymbolTable *libTable) {
 				}
 				if (loadCmd->cmd == LC_LOAD_DYLIB) {
 					struct dylib_command *linkedLibrary = (struct dylib_command *)loadCmd;
-					printf("%s\n",(char*)loadCmd+linkedLibrary->dylib.name.offset);
+					if (loadCmd+linkedLibrary->dylib.name.offset) {
+						printf("%s\n",(char*)loadCmd+linkedLibrary->dylib.name.offset);
+					}
 				}
 				loadCmd = (struct load_command *)((char*)loadCmd + loadCmd->cmdsize);
 			}
@@ -146,12 +148,13 @@ void SDMSTGenerateSortedSymbolTable(struct SDMMOLibrarySymbolTable *libTable) {
 					aSymbol->tableNumber = i;
 					aSymbol->symbolNumber = j;
 					aSymbol->offset = (void*)symbolAddress + (libTable->couldLoad ? _dyld_get_image_vmaddr_slide(libTable->libInfo->imageNumber) : 0);
-					aSymbol->isStub = !entry->n_un.n_strx;
-					if (entry->n_un.n_strx) {
+					if (entry->n_un.n_strx && entry->n_un.n_strx < cmd->strsize) {
 						aSymbol->name = ((char *)strTable + entry->n_un.n_strx);
+						aSymbol->isStub = false;
 					} else {
 						aSymbol->name = calloc(14+((libTable->symbolCount==0) ? 1 : (uint32_t)log10(libTable->symbolCount) + 1), sizeof(char));
 						sprintf(aSymbol->name, "__sdmst_stub_%i", libTable->symbolCount);
+						aSymbol->isStub = true;
 					}
 					libTable->table[libTable->symbolCount] = *aSymbol;
 					libTable->symbolCount++;

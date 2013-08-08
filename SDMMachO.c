@@ -16,5 +16,9 @@
  * 
  */
 
+#ifndef _SDMMACHO_C_
+#define _SDMMACHO_C_
+
 #include "SDMMachO.h"
 
+#endif

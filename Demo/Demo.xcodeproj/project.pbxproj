@@ -111,24 +111,64 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
-		22D5F428179DC1C700C34745 /* SDMSymbolTable */ = {
+		2279875317ABF85B00985DEF /* Assembly */ = {
+			isa = PBXGroup;
+			children = (
+				2279867D17AB00D100985DEF /* SDMSymbolCall.s */,
+				22D5F52F179DC1C900C34745 /* disasm.h */,
+				22D5F52E179DC1C900C34745 /* disasm.c */,
+				2279875517ABF86C00985DEF /* ARM */,
+				2279875417ABF86400985DEF /* Intel */,
+			);
+			name = Assembly;
+			sourceTree = "<group>";
+		};
+		2279875417ABF86400985DEF /* Intel */ = {
+			isa = PBXGroup;
+			children = (
+				22D5F543179DC1C900C34745 /* udis86.h */,
+				22D5F530179DC1C900C34745 /* libudis86 */,
+			);
+			name = Intel;
+			sourceTree = "<group>";
+		};
+		2279875517ABF86C00985DEF /* ARM */ = {
 			isa = PBXGroup;
 			children = (
 				22D5F516179DC1C900C34745 /* arm_decode.c */,
 				22D5F517179DC1C900C34745 /* arm_decode.h */,
-				22D5F52E179DC1C900C34745 /* disasm.c */,
-				22D5F52F179DC1C900C34745 /* disasm.h */,
-				22D5F530179DC1C900C34745 /* libudis86 */,
-				22D5F53F179DC1C900C34745 /* LICENSE */,
-				22D5F540179DC1C900C34745 /* README.md */,
-				22D5F541179DC1C900C34745 /* SDMSymbolTable.c */,
-				22D5F542179DC1C900C34745 /* SDMSymbolTable.h */,
-				22D5F543179DC1C900C34745 /* udis86.h */,
+			);
+			name = ARM;
+			sourceTree = "<group>";
+		};
+		2279875617ABF88A00985DEF /* PE */ = {
+			isa = PBXGroup;
+			children = (
 				22D5F75917A035B500C34745 /* SDMPESymbolTable.h */,
 				22D5F75A17A035B500C34745 /* SDMPESymbolTable.c */,
+			);
+			name = PE;
+			sourceTree = "<group>";
+		};
+		2279876417ABF8B000985DEF /* Mach-O */ = {
+			isa = PBXGroup;
+			children = (
 				227985F217A9B71600985DEF /* SDMMachO.h */,
 				227985F317A9B71600985DEF /* SDMMachO.c */,
-				2279867D17AB00D100985DEF /* SDMSymbolCall.s */,
+			);
+			name = "Mach-O";
+			sourceTree = "<group>";
+		};
+		22D5F428179DC1C700C34745 /* SDMSymbolTable */ = {
+			isa = PBXGroup;
+			children = (
+				2279876417ABF8B000985DEF /* Mach-O */,
+				2279875617ABF88A00985DEF /* PE */,
+				2279875317ABF85B00985DEF /* Assembly */,
+				22D5F53F179DC1C900C34745 /* LICENSE */,
+				22D5F540179DC1C900C34745 /* README.md */,
+				22D5F542179DC1C900C34745 /* SDMSymbolTable.h */,
+				22D5F541179DC1C900C34745 /* SDMSymbolTable.c */,
 			);
 			name = SDMSymbolTable;
 			path = ..;
