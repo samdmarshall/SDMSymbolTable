@@ -9,7 +9,7 @@ int main (int argc, const char * argv[]) {
 			printf("%s\n",lib->table[i].name);
 		}
 	} else {
-		struct SDMMOLibrarySymbolTable *lib = SDMSTLoadLibrary("/Applications/iTunes.app/Contents/Frameworks/iPodUpdater.framework/iPodUpdater");
+		struct SDMMOLibrarySymbolTable *lib = SDMSTLoadLibrary("/Volumes/Data/Users/sam/Applications/Halo.app/Contents/MacOS/Halo");
 		printf("Found %i symbols...\n",lib->symbolCount);
 		for (uint32_t i = 0; i < lib->symbolCount; i++) {
 			printf("%s\n",lib->table[i].name);
